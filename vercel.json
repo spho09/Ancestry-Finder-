@@ -4,9 +4,15 @@
       "src": "api/predict.py",
       "use": "@vercel/python",
       "config": { "includeFiles": "api/model/**" }
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
-    { "src": "/api/predict", "dest": "/api/predict.py" }
+    { "src": "/api/predict", "dest": "/api/predict.py" },
+    { "src": "/", "dest": "/public/index.html" },
+    { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
