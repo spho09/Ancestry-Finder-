@@ -16,7 +16,7 @@ request:
 Only depends on numpy at request time -- keeps the deployed bundle small
 and cold starts fast.
 """
-
+import traceback
 import json
 import os
 from http.server import BaseHTTPRequestHandler
@@ -211,8 +211,17 @@ class handler(BaseHTTPRequestHandler):
             result = handle_request(body)
             status = 400 if "error" in result else 200
             self._respond(status, result)
-        except Exception as exc:  # noqa: BLE001
-            self._respond(500, {"error": f"Internal error: {exc}"})
+        except Exception:
+    error = traceback.format_exc()
+    print(error)
+
+    self._respond(
+        500,
+        {
+            "error": "Internal Server Error",
+            "traceback": error
+        }
+    )
 
     def do_OPTIONS(self):
         self._respond(204, None)
