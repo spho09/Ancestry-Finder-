@@ -33,7 +33,7 @@ _model = None  # lazy-loaded, cached across warm invocations
 def load_model():
     global _model
     if _model is None:
-        with np.load(MODEL_PATH, allow_pickle=False) as data:
+        with np.load(MODEL_PATH, allow_pickle=True) as data:
             _model = {k: data[k] for k in data.files}
     return _model
 
