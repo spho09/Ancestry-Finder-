@@ -266,18 +266,33 @@
 
     try {
       const body = await selectedFile.text();
-      const resp = await fetch('/api/predict', { method: 'POST', body });
-      const data = await resp.json();
+const resp = await fetch('/api/predict', {
+  method: 'POST',
+  body
+});
 
-      if (!resp.ok || data.error) {
-        statusEl.textContent = data.error || 'Something went wrong.';
-        statusEl.classList.add('error');
-        runBtn.disabled = false;
-        return;
-      }
+// If the server returned an HTTP error, show the actual message
+if (!resp.ok) {
+  const text = await resp.text();
+  throw new Error(text);
+}
 
-      statusEl.textContent = '';
-      renderResults(data);
+// Try to parse JSON
+let data;
+try {
+  data = await resp.json();
+} catch (e) {
+  const text = await resp.text();
+  throw new Error("Server did not return valid JSON:\n\n" + text);
+}
+
+// Backend returned an application-level error
+if (data.error) {
+  throw new Error(data.error);
+}
+
+statusEl.textContent = '';
+renderResults(data);
     } catch (err) {
       statusEl.textContent = 'Request failed: ' + err.message;
       statusEl.classList.add('error');
