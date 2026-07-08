@@ -263,6 +263,35 @@
   const ctx = canvas.getContext('2d');
 
   let selectedFile = null;
+  let referenceSnps = null;
+  let referenceScatter = null;
+
+  async function loadReferenceAssets() {
+    try {
+      const [snps, scatter] = await Promise.all([
+        fetch('/reference_snps.json').then(r => r.json()),
+        fetch('/reference_scatter.json').then(r => r.json()),
+      ]);
+      referenceSnps = new Set(snps);
+      referenceScatter = scatter;
+    } catch (err) {
+      console.warn('Could not load reference assets:', err);
+    }
+  }
+  loadReferenceAssets();
+
+  /** Keep only SNPs the model uses — shrinks ~600k-line exports to ~80k for upload. */
+  function filterToReferenceSnps(text) {
+    if (!referenceSnps) return text;
+    const lines = [];
+    for (const line of text.split('\n')) {
+      if (!line || line[0] === '#') continue;
+      const delim = line.includes('\t') ? '\t' : ',';
+      const rsid = line.split(delim)[0];
+      if (referenceSnps.has(rsid)) lines.push(line);
+    }
+    return lines.join('\n');
+  }
 
   dropEl.addEventListener('click', () => fileInput.click());
   ['dragover', 'dragleave', 'drop'].forEach(evt => {
@@ -290,11 +319,20 @@
     if (!selectedFile) return;
     runBtn.disabled = true;
     statusEl.classList.remove('error');
-    statusEl.textContent = 'Uploading and projecting into PCA space…';
+    statusEl.textContent = 'Filtering SNPs and uploading…';
     resultsEl.classList.remove('show');
 
     try {
-      const body = await selectedFile.text();
+      const raw = await selectedFile.text();
+      const body = filterToReferenceSnps(raw);
+      const kept = body ? body.split('\n').filter(Boolean).length : 0;
+      if (kept < 500) {
+        statusEl.textContent = `Only ${kept} overlapping SNPs after filtering — check file format or genome build (hg19).`;
+        statusEl.classList.add('error');
+        runBtn.disabled = false;
+        return;
+      }
+      statusEl.textContent = `Uploading ${kept.toLocaleString()} SNPs…`;
       const resp = await fetch('/api/predict', { method: 'POST', body });
       const data = await resp.json();
 
@@ -345,7 +383,7 @@
 
     noteEl.textContent = data.note;
 
-    drawScatter(data.pca_coordinates, data.reference_scatter);
+    drawScatter(data.pca_coordinates, referenceScatter);
     renderScatterLegend();
     resultsEl.classList.add('show');
   }

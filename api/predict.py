@@ -35,108 +35,114 @@ def load_model():
     if _model is None:
         with np.load(MODEL_PATH, allow_pickle=False) as data:
             _model = {k: data[k] for k in data.files}
+        snp_ids = _model["snp_ids"]
+        _model["id_to_idx"] = {str(rsid): i for i, rsid in enumerate(snp_ids)}
+        _model["needed_rsids"] = set(_model["id_to_idx"])
     return _model
 
 
-def parse_23andme_raw(text: str):
-    """rsid\tchromosome\tposition\tgenotype, '#' comment lines."""
+def _parse_23andme_line(line: str, id_to_idx: dict, calls: dict) -> None:
+    parts = line.split("\t")
+    if len(parts) < 4:
+        parts = line.split(",")
+    if len(parts) < 4:
+        return
+    rsid = parts[0]
+    idx = id_to_idx.get(rsid)
+    if idx is None:
+        return
+    genotype = parts[3].replace("-", "")
+    if len(genotype) == 2:
+        calls[rsid] = (genotype[0], genotype[1])
+
+
+def _parse_vcf_line(line: str, id_to_idx: dict, calls: dict) -> None:
+    fields = line.split("\t")
+    if len(fields) < 10:
+        return
+    rsid = fields[2]
+    idx = id_to_idx.get(rsid)
+    if idx is None:
+        return
+    ref, alt = fields[3], fields[4]
+    if rsid == "." or len(ref) != 1 or len(alt) != 1:
+        return
+    fmt = fields[8].split(":")
+    sample = fields[9].split(":")
+    try:
+        gt = sample[fmt.index("GT")]
+    except ValueError:
+        return
+    alleles = gt.replace("|", "/").split("/")
+    if len(alleles) != 2 or "." in alleles:
+        return
+    base = {"0": ref, "1": alt}
+    a1 = base.get(alleles[0])
+    a2 = base.get(alleles[1])
+    if a1 and a2:
+        calls[rsid] = (a1, a2)
+
+
+def parse_upload(body: bytes, model: dict) -> dict:
+    """Parse only SNPs present in the reference panel (single pass, low memory)."""
+    id_to_idx = model["id_to_idx"]
     calls = {}
-    for line in text.splitlines():
-        if not line or line.startswith("#"):
+    is_vcf = False
+    header_checked = False
+
+    for raw_line in body.splitlines():
+        if not raw_line:
             continue
-        parts = line.strip().split("\t")
-        if len(parts) < 4:
-            parts = line.strip().split(",")
-        if len(parts) < 4:
+        line = raw_line.decode("utf-8", errors="ignore").strip()
+        if not line:
             continue
-        rsid, _chrom, _pos, genotype = parts[0], parts[1], parts[2], parts[3]
-        genotype = genotype.replace("-", "")
-        if len(genotype) == 2:
-            calls[rsid] = (genotype[0], genotype[1])
+        if not header_checked:
+            is_vcf = line.startswith("##fileformat=VCF") or line.startswith("#CHROM")
+            header_checked = True
+        if line.startswith("#"):
+            continue
+        if is_vcf:
+            _parse_vcf_line(line, id_to_idx, calls)
+        else:
+            _parse_23andme_line(line, id_to_idx, calls)
+        # early exit once every reference SNP is found
+        if len(calls) >= len(id_to_idx):
+            break
     return calls
-
-
-def parse_vcf(text: str):
-    """Minimal single-sample VCF parser: rsID column (ID field) -> genotype."""
-    calls = {}
-    for line in text.splitlines():
-        if not line or line.startswith("##"):
-            continue
-        if line.startswith("#CHROM"):
-            continue
-        fields = line.strip().split("\t")
-        if len(fields) < 10:
-            continue
-        rsid = fields[2]
-        ref, alt = fields[3], fields[4]
-        if rsid == "." or len(ref) != 1 or len(alt) != 1:
-            continue  # skip indels/unnamed variants for simplicity
-        fmt = fields[8].split(":")
-        sample = fields[9].split(":")
-        try:
-            gt = sample[fmt.index("GT")]
-        except ValueError:
-            continue
-        alleles = gt.replace("|", "/").split("/")
-        if len(alleles) != 2 or "." in alleles:
-            continue
-        base = {"0": ref, "1": alt}
-        a1 = base.get(alleles[0])
-        a2 = base.get(alleles[1])
-        if a1 and a2:
-            calls[rsid] = (a1, a2)
-    return calls
-
-
-def detect_and_parse(text: str):
-    if text.lstrip().startswith("##fileformat=VCF") or "\n#CHROM" in text:
-        return parse_vcf(text)
-    return parse_23andme_raw(text)
 
 
 def build_feature_vector(calls: dict, model: dict):
     snp_ids = model["snp_ids"]
     ref_allele = model["ref_allele"]
     alt_allele = model["alt_allele"]
-    allele_freq = model["allele_freq"]  # freq of alt_allele in reference
-    pca_mean = model["pca_mean"]
+    allele_freq = model["allele_freq"]
 
     n = len(snp_ids)
-    dosage = 2 * allele_freq.copy()  # default: mean-impute missing SNPs
-    used_mask = np.zeros(n, dtype=bool)
-
-    # index lookup for the (much smaller) set of overlapping SNPs
-    id_to_idx = {rsid: i for i, rsid in enumerate(snp_ids)}
+    dosage = 2 * allele_freq.copy()
+    id_to_idx = model["id_to_idx"]
     n_matched = 0
     n_ambiguous_dropped = 0
 
     for rsid, (a1, a2) in calls.items():
-        idx = id_to_idx.get(rsid)
-        if idx is None:
-            continue
+        idx = id_to_idx[rsid]
         ref = ref_allele[idx]
         alt = alt_allele[idx]
-        obs = {a1, a2}
-        allowed = {ref, alt}
-        if not obs.issubset(allowed):
-            # allele mismatch (build mismatch, genotyping error, etc.) - skip
+        if not {a1, a2}.issubset({ref, alt}):
             n_ambiguous_dropped += 1
             continue
-        count_alt = (a1 == alt) + (a2 == alt)
-        dosage[idx] = count_alt
-        used_mask[idx] = True
+        dosage[idx] = (a1 == alt) + (a2 == alt)
         n_matched += 1
 
-    return dosage, used_mask, n_matched, n_ambiguous_dropped
+    return dosage, n_matched, n_ambiguous_dropped
 
 
 def project_and_classify(dosage: np.ndarray, model: dict):
     pca_mean = model["pca_mean"]
-    pca_components = model["pca_components"]  # (k, n_snps)
-    ref_pcs = model["ref_pcs"]                 # (n_ref, k)
+    pca_components = model["pca_components"]
+    ref_pcs = model["ref_pcs"]
     ref_super_pop = model["ref_super_pop"]
 
-    user_pcs = (dosage - pca_mean) @ pca_components.T  # (k,)
+    user_pcs = (dosage - pca_mean) @ pca_components.T
 
     dists = np.linalg.norm(ref_pcs - user_pcs[np.newaxis, :], axis=1)
     nn_idx = np.argsort(dists)[:K_NEIGHBORS]
@@ -151,16 +157,10 @@ def project_and_classify(dosage: np.ndarray, model: dict):
         proportions[label] = proportions.get(label, 0.0) + float(w)
 
     closest_population = max(proportions, key=proportions.get)
-    # simple confidence heuristic: how dominant is the top population,
-    # and how tight is the nearest-neighbor cloud
     top_share = proportions[closest_population]
 
     return {
-        "pca_coordinates": user_pcs[:2].tolist(),  # PC1/PC2 for plotting
-        "reference_scatter": {
-            "points": ref_pcs[:, :2].tolist(),
-            "labels": ref_super_pop.tolist(),
-        },
+        "pca_coordinates": user_pcs[:2].tolist(),
         "ancestry_proportions": {k: round(v, 4) for k, v in proportions.items()},
         "closest_population": closest_population,
         "confidence": round(float(top_share), 3),
@@ -170,20 +170,19 @@ def project_and_classify(dosage: np.ndarray, model: dict):
 
 def handle_request(body: bytes) -> dict:
     model = load_model()
-    text = body.decode("utf-8", errors="ignore")
-    calls = detect_and_parse(text)
+    calls = parse_upload(body, model)
 
     if len(calls) < MIN_SNPS_REQUIRED:
         return {
             "error": (
-                f"Only parsed {len(calls)} genotype calls from the uploaded file. "
-                f"Need at least {MIN_SNPS_REQUIRED} to produce a reliable estimate. "
-                "Check that the file is a 23andMe/AncestryDNA raw export or a "
-                "single-sample VCF."
+                f"Only {len(calls)} overlapping SNPs found in the uploaded file "
+                f"(need at least {MIN_SNPS_REQUIRED}). "
+                "For large raw exports, use a current browser so the file can be "
+                "filtered before upload. Also check genome build (reference is hg19)."
             )
         }
 
-    dosage, used_mask, n_matched, n_dropped = build_feature_vector(calls, model)
+    dosage, n_matched, n_dropped = build_feature_vector(calls, model)
 
     if n_matched < MIN_SNPS_REQUIRED:
         return {
