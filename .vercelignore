@@ -1,0 +1,11 @@
+# Large local-only data — never deploy these
+1kg/
+offline/
+tools/
+test_data/
+
+# Misc
+todo.md
+README.md
+main.py
+.env.local
