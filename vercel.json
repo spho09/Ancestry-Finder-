@@ -1,11 +1,17 @@
 {
-  "functions": {
-    "api/predict.py": {
-      "memory": 1024,
-      "maxDuration": 30
+  "builds": [
+    {
+      "src": "api/predict.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": "api/model/**"
+      }
     }
-  },
-  "rewrites": [
-    { "source": "/api/predict", "destination": "/api/predict.py" }
+  ],
+  "routes": [
+    {
+      "src": "/api/predict",
+      "dest": "/api/predict.py"
+    }
   ]
 }
