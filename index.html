@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Genetic Ancestry Estimator</title>
+<style>
+  :root {
+    --ink: #0d1321;
+    --ink-soft: #16203a;
+    --line: #2a3655;
+    --paper: #eef1f7;
+    --accent: #4fd1c5;
+    --accent-dim: #2b6f6a;
+    --warn: #e0985a;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+
+  .locus-rule {
+    height: 3px;
+    background: repeating-linear-gradient(
+      90deg, var(--accent) 0 6px, transparent 6px 10px
+    );
+    opacity: 0.7;
+  }
+
+  header {
+    padding: 48px 24px 28px;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: clamp(28px, 4vw, 42px);
+    line-height: 1.08;
+    margin: 0 0 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  p.lede {
+    color: #aeb8d4;
+    font-size: 16px;
+    line-height: 1.55;
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 8px 24px 80px;
+  }
+
+  .panel {
+    background: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 28px;
+    margin-top: 28px;
+  }
+
+  .drop {
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .drop:hover, .drop.drag {
+    border-color: var(--accent);
+    background: rgba(79, 209, 197, 0.06);
+  }
+  .drop input { display: none; }
+  .drop .filename {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 10px;
+  }
+
+  button.run {
+    margin-top: 18px;
+    width: 100%;
+    padding: 13px 20px;
+    background: var(--accent);
+    color: #06231f;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button.run:disabled { background: #3a4360; color: #7a86a8; cursor: not-allowed; }
+  button.run:not(:disabled):hover { background: #6fe0d5; }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: #aeb8d4;
+    margin-top: 12px;
+    min-height: 18px;
+  }
+  .status.error { color: var(--warn); }
+
+  .results { display: none; }
+  .results.show { display: block; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 56px;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .bar-track {
+    background: #0a0f1c;
+    border-radius: 4px;
+    height: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #aeb8d4;
+  }
+  .meta-grid .k { color: #7a86a8; }
+  .meta-grid .v { color: var(--paper); font-size: 15px; }
+
+  .note {
+    margin-top: 22px;
+    padding: 14px 16px;
+    border-left: 2px solid var(--warn);
+    background: rgba(224, 152, 90, 0.08);
+    font-size: 13px;
+    line-height: 1.5;
+    color: #dcc3a6;
+  }
+
+  #scatter { display: block; margin-top: 22px; border-radius: 6px; border: 1px solid var(--line); background: #0a0f1c; }
+
+  footer {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+    color: #5b6588;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+  <div class="locus-rule"></div>
+  <header>
+    <div class="eyebrow">SNP &middot; PCA &middot; Reference Panel</div>
+    <h1>Genetic ancestry estimator</h1>
+    <p class="lede">
+      Upload a raw SNP export (23andMe/AncestryDNA text, or a single-sample VCF).
+      It's projected into a PCA space built from a public reference panel and
+      compared against reference populations — entirely for the current
+      request, nothing is stored server-side.
+    </p>
+  </header>
+
+  <main>
+    <div class="panel">
+      <div class="drop" id="drop">
+        <div>Drop your raw SNP file here, or click to choose one</div>
+        <div class="filename" id="filename"></div>
+        <input type="file" id="file-input" accept=".txt,.csv,.vcf" />
+      </div>
+      <button class="run" id="run-btn" disabled>Estimate ancestry</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="panel results" id="results">
+      <div id="bars"></div>
+      <canvas id="scatter" width="800" height="360"></canvas>
+      <div class="meta-grid" id="meta"></div>
+      <div class="note" id="note"></div>
+    </div>
+  </main>
+
+  <footer>
+    Reference clusters: 1000 Genomes super-populations (AFR / AMR / EAS / EUR / SAS).
+    Estimates reflect genetic similarity to these reference groups, not self-identified ethnicity.
+  </footer>
+
+<script>
+  const dropEl = document.getElementById('drop');
+  const fileInput = document.getElementById('file-input');
+  const filenameEl = document.getElementById('filename');
+  const runBtn = document.getElementById('run-btn');
+  const statusEl = document.getElementById('status');
+  const resultsEl = document.getElementById('results');
+  const barsEl = document.getElementById('bars');
+  const metaEl = document.getElementById('meta');
+  const noteEl = document.getElementById('note');
+  const canvas = document.getElementById('scatter');
+  const ctx = canvas.getContext('2d');
+
+  let selectedFile = null;
+
+  dropEl.addEventListener('click', () => fileInput.click());
+  ['dragover', 'dragleave', 'drop'].forEach(evt => {
+    dropEl.addEventListener(evt, e => {
+      e.preventDefault();
+      dropEl.classList.toggle('drag', evt === 'dragover');
+    });
+  });
+  dropEl.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length) setFile(e.target.files[0]);
+  });
+
+  function setFile(f) {
+    selectedFile = f;
+    filenameEl.textContent = f.name;
+    runBtn.disabled = false;
+    statusEl.textContent = '';
+    statusEl.classList.remove('error');
+  }
+
+  runBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    runBtn.disabled = true;
+    statusEl.classList.remove('error');
+    statusEl.textContent = 'Uploading and projecting into PCA space…';
+    resultsEl.classList.remove('show');
+
+    try {
+      const body = await selectedFile.text();
+      const resp = await fetch('/api/predict', { method: 'POST', body });
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        statusEl.textContent = data.error || 'Something went wrong.';
+        statusEl.classList.add('error');
+        runBtn.disabled = false;
+        return;
+      }
+
+      statusEl.textContent = '';
+      renderResults(data);
+    } catch (err) {
+      statusEl.textContent = 'Request failed: ' + err.message;
+      statusEl.classList.add('error');
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+
+  const POP_LABELS = {
+    AFR: 'African', AMR: 'American', EAS: 'East Asian',
+    EUR: 'European', SAS: 'South Asian'
+  };
+
+  function renderResults(data) {
+    barsEl.innerHTML = '';
+    const entries = Object.entries(data.ancestry_proportions)
+      .sort((a, b) => b[1] - a[1]);
+
+    entries.forEach(([pop, frac]) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `
+        <div>${POP_LABELS[pop] || pop}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(frac * 100).toFixed(1)}%"></div></div>
+        <div>${(frac * 100).toFixed(1)}%</div>
+      `;
+      barsEl.appendChild(row);
+    });
+
+    metaEl.innerHTML = `
+      <div><div class="k">Closest population</div><div class="v">${POP_LABELS[data.closest_population] || data.closest_population}</div></div>
+      <div><div class="k">Confidence</div><div class="v">${(data.confidence * 100).toFixed(1)}%</div></div>
+      <div><div class="k">SNPs used</div><div class="v">${data.n_snps_used.toLocaleString()}</div></div>
+      <div><div class="k">Reference panel size</div><div class="v">${data.n_snps_total_in_reference.toLocaleString()}</div></div>
+    `;
+
+    noteEl.textContent = data.note;
+
+    drawPoint(data.pca_coordinates);
+    resultsEl.classList.add('show');
+  }
+
+  function drawPoint(coords) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0a0f1c';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // axes
+    ctx.strokeStyle = '#2a3655';
+    ctx.beginPath();
+    ctx.moveTo(40, canvas.height / 2);
+    ctx.lineTo(canvas.width - 20, canvas.height / 2);
+    ctx.moveTo(canvas.width / 2, 20);
+    ctx.lineTo(canvas.width / 2, canvas.height - 20);
+    ctx.stroke();
+
+    ctx.fillStyle = '#7a86a8';
+    ctx.font = '11px monospace';
+    ctx.fillText('PC1', canvas.width - 34, canvas.height / 2 - 8);
+    ctx.fillText('PC2', canvas.width / 2 + 8, 30);
+
+    // user point — scaled arbitrarily since we don't ship full reference
+    // cloud to the browser; a fuller build could pass down reference PC1/PC2
+    // for a background scatter of reference samples.
+    const scale = 12;
+    const x = canvas.width / 2 + coords[0] * scale;
+    const y = canvas.height / 2 - coords[1] * scale;
+
+    ctx.fillStyle = '#4fd1c5';
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0d1321';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#eef1f7';
+    ctx.font = '12px monospace';
+    ctx.fillText('you', x + 12, y + 4);
+  }
+</script>
+</body>
+</html>
