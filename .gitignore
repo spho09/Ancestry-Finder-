@@ -9,4 +9,4 @@ offline/reference_pruned.bim
 offline/reference_pruned.fam
 offline/model/
 tools/
-test_data/large/
+test_data/large/.debug*
