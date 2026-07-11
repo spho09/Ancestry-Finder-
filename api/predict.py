@@ -141,31 +141,59 @@ def project_and_classify(dosage: np.ndarray, model: dict):
     pca_components = model["pca_components"]
     ref_pcs = model["ref_pcs"]
     ref_super_pop = model["ref_super_pop"]
+    ref_pop = model["ref_pop"]
 
     user_pcs = (dosage - pca_mean) @ pca_components.T
 
     dists = np.linalg.norm(ref_pcs - user_pcs[np.newaxis, :], axis=1)
     nn_idx = np.argsort(dists)[:K_NEIGHBORS]
-    nn_dists = dists[nn_idx]
-    nn_labels = ref_super_pop[nn_idx]
+nn_dists = dists[nn_idx]
 
-    weights = 1.0 / (nn_dists + 1e-6)
-    weights /= weights.sum()
+weights = 1.0 / (nn_dists + 1e-6)
+weights /= weights.sum()
 
-    proportions = {}
-    for label, w in zip(nn_labels, weights):
-        proportions[label] = proportions.get(label, 0.0) + float(w)
+# Continental ancestry (AFR, EUR, AMR, ...)
+continent_labels = ref_super_pop[nn_idx]
+continent_props = {}
 
-    closest_population = max(proportions, key=proportions.get)
-    top_share = proportions[closest_population]
+for label, w in zip(continent_labels, weights):
+    continent_props[label] = continent_props.get(label, 0.0) + float(w)
 
-    return {
-        "pca_coordinates": user_pcs[:2].tolist(),
-        "ancestry_proportions": {k: round(v, 4) for k, v in proportions.items()},
-        "closest_population": closest_population,
-        "confidence": round(float(top_share), 3),
-        "mean_neighbor_distance": round(float(nn_dists.mean()), 3),
-    }
+# Detailed populations (PUR, CLM, GBR, YRI, ...)
+population_labels = ref_pop[nn_idx]
+population_props = {}
+
+for label, w in zip(population_labels, weights):
+    population_props[label] = population_props.get(label, 0.0) + float(w)
+
+closest_population = max(population_props, key=population_props.get)
+top_share = population_props[closest_population]
+
+return {
+    "pca_coordinates": user_pcs[:2].tolist(),
+
+    "ancestry_proportions": {
+        k: round(v, 4)
+        for k, v in sorted(
+            continent_props.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+    },
+
+    "closest_populations": {
+        k: round(v, 4)
+        for k, v in sorted(
+            population_props.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+    },
+
+    "closest_population": closest_population,
+    "confidence": round(float(top_share), 3),
+    "mean_neighbor_distance": round(float(nn_dists.mean()), 3),
+}
 
 
 def handle_request(body: bytes) -> dict:
