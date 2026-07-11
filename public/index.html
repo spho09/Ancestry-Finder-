@@ -8,11 +8,15 @@
   :root {
     --ink: #0d1321;
     --ink-soft: #16203a;
+    --ink-soft2: #1c2846;
     --line: #2a3655;
     --paper: #eef1f7;
+    --muted: #aeb8d4;
+    --dim: #7a86a8;
     --accent: #4fd1c5;
     --accent-dim: #2b6f6a;
     --warn: #e0985a;
+    --bad: #e0716a;
     --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
     --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
   }
@@ -59,7 +63,7 @@
   }
 
   p.lede {
-    color: #aeb8d4;
+    color: var(--muted);
     font-size: 16px;
     line-height: 1.55;
     max-width: 62ch;
@@ -78,6 +82,15 @@
     border-radius: 10px;
     padding: 28px;
     margin-top: 28px;
+  }
+
+  h2.section-title {
+    font-size: 13px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    margin: 0 0 16px;
   }
 
   .drop {
@@ -113,24 +126,26 @@
     cursor: pointer;
     transition: background 0.15s ease;
   }
-  button.run:disabled { background: #3a4360; color: #7a86a8; cursor: not-allowed; }
+  button.run:disabled { background: #3a4360; color: var(--dim); cursor: not-allowed; }
   button.run:not(:disabled):hover { background: #6fe0d5; }
 
   .status {
     font-family: var(--mono);
     font-size: 13px;
-    color: #aeb8d4;
+    color: var(--muted);
     margin-top: 12px;
     min-height: 18px;
   }
-  .status.error { color: var(--warn); }
+  .status.error { color: var(--bad); }
+  .status.warn { color: var(--warn); }
 
   .results { display: none; }
   .results.show { display: block; }
 
+  /* --- continental ancestry bars --- */
   .bar-row {
     display: grid;
-    grid-template-columns: 90px 1fr 56px;
+    grid-template-columns: 120px 1fr 56px;
     align-items: center;
     gap: 12px;
     margin: 10px 0;
@@ -149,20 +164,88 @@
     background: linear-gradient(90deg, var(--accent-dim), var(--accent));
   }
 
+  /* --- closest populations list --- */
+  .pop-list { margin-top: 6px; }
+  .pop-row {
+    display: grid;
+    grid-template-columns: 1fr auto 70px;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .pop-row:last-child { border-bottom: none; }
+  .pop-row .pop-name { font-weight: 500; }
+  .pop-row .pop-code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    margin-left: 6px;
+  }
+  .pop-row .pop-super {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    text-align: right;
+  }
+  .pop-row .pop-pct {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    text-align: right;
+  }
+
+  /* --- confidence badge --- */
+  .confidence-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .confidence-badge {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 22px;
+    padding: 3px 12px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+  }
+  .confidence-badge.high { background: rgba(79, 209, 197, 0.15); color: var(--accent); }
+  .confidence-badge.medium { background: rgba(224, 152, 90, 0.15); color: var(--warn); }
+  .confidence-badge.low { background: rgba(224, 113, 106, 0.15); color: var(--bad); }
+  .confidence-numeric {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+  }
+
+  /* --- interpretation --- */
+  .interpretation {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--paper);
+    padding: 16px 18px;
+    background: var(--ink-soft2);
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
+    margin-top: 4px;
+  }
+
   .meta-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 14px;
-    margin-top: 22px;
+    margin-top: 6px;
     font-family: var(--mono);
     font-size: 12px;
-    color: #aeb8d4;
+    color: var(--muted);
   }
-  .meta-grid .k { color: #7a86a8; }
+  .meta-grid .k { color: var(--dim); }
   .meta-grid .v { color: var(--paper); font-size: 15px; }
 
   .note {
-    margin-top: 22px;
+    margin-top: 4px;
     padding: 14px 16px;
     border-left: 2px solid var(--warn);
     background: rgba(224, 152, 90, 0.08);
@@ -171,7 +254,18 @@
     color: #dcc3a6;
   }
 
-  #scatter { display: block; margin-top: 22px; border-radius: 6px; border: 1px solid var(--line); background: #0a0f1c; }
+  .science-note {
+    margin-top: 4px;
+    padding: 14px 16px;
+    border-left: 2px solid var(--line);
+    background: rgba(255,255,255,0.02);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  .science-note strong { color: var(--paper); }
+
+  #scatter { display: block; margin-top: 10px; border-radius: 6px; border: 1px solid var(--line); background: #0a0f1c; max-width: 100%; height: auto; }
 
   .scatter-legend {
     display: flex;
@@ -180,7 +274,7 @@
     margin-top: 12px;
     font-family: var(--mono);
     font-size: 12px;
-    color: #aeb8d4;
+    color: var(--muted);
   }
   .scatter-legend span {
     display: inline-flex;
@@ -200,6 +294,10 @@
     border: 2px solid #0d1321;
   }
 
+  .panel + .panel { margin-top: 20px; }
+  .subsection { margin-top: 26px; }
+  .subsection:first-child { margin-top: 0; }
+
   footer {
     max-width: 880px;
     margin: 0 auto;
@@ -213,13 +311,13 @@
 <body>
   <div class="locus-rule"></div>
   <header>
-    <div class="eyebrow">SNP &middot; PCA &middot; Reference Panel</div>
+    <div class="eyebrow">SNP &middot; PCA &middot; 1000 Genomes Reference Panel</div>
     <h1>Genetic ancestry estimator</h1>
     <p class="lede">
       Upload a raw SNP export (23andMe/AncestryDNA text, or a single-sample VCF).
-      It's projected into a PCA space built from a public reference panel and
-      compared against reference populations — entirely for the current
-      request, nothing is stored server-side.
+      It's projected into a PCA space built from the public 1000 Genomes reference
+      panel and compared against 26 reference populations — entirely for the
+      current request, nothing is stored server-side.
     </p>
   </header>
 
@@ -235,20 +333,135 @@
     </div>
 
     <div class="panel results" id="results">
-      <div id="bars"></div>
-      <canvas id="scatter" width="800" height="360"></canvas>
-      <div class="scatter-legend" id="scatter-legend"></div>
-      <div class="meta-grid" id="meta"></div>
-      <div class="note" id="note"></div>
+
+      <div class="subsection">
+        <h2 class="section-title">Estimated Continental Ancestry</h2>
+        <div id="bars"></div>
+      </div>
+
+      <div class="subsection">
+        <h2 class="section-title">Closest Reference Populations</h2>
+        <div class="pop-list" id="pop-list"></div>
+      </div>
+
+      <div class="subsection">
+        <h2 class="section-title">Confidence</h2>
+        <div class="confidence-row">
+          <span class="confidence-badge" id="confidence-badge"></span>
+          <span class="confidence-numeric" id="confidence-numeric"></span>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <h2 class="section-title">Interpretation</h2>
+        <div class="interpretation" id="interpretation"></div>
+      </div>
+
+      <div class="subsection">
+        <h2 class="section-title">PCA Projection</h2>
+        <canvas id="scatter" width="800" height="360"></canvas>
+        <div class="scatter-legend" id="scatter-legend"></div>
+      </div>
+
+      <div class="subsection">
+        <h2 class="section-title">Sample Details</h2>
+        <div class="meta-grid" id="meta"></div>
+      </div>
+
+      <div class="subsection">
+        <div class="note" id="note"></div>
+      </div>
+
+      <div class="subsection">
+        <div class="science-note">
+          <strong>Why SNP frequencies differ by population:</strong> the markers used here
+          are ancestry-informative SNPs — positions in the genome where the frequency of
+          each variant differs across populations because of demographic history:
+          geographic isolation, migration, and genetic drift accumulated over tens of
+          thousands of years. No single SNP determines ancestry; the pattern across
+          thousands of them, compared statistically to reference populations, is what
+          produces a similarity estimate.
+        </div>
+      </div>
+
     </div>
   </main>
 
   <footer>
-    Reference clusters: 1000 Genomes super-populations (AFR / AMR / EAS / EUR / SAS).
-    Estimates reflect genetic similarity to these reference groups, not self-identified ethnicity.
+    Training data: 1000 Genomes Phase 3 reference panel (2,504 individuals, 26 populations).
+    Test data: your uploaded genome, never used to build the reference model.
+    Results describe genetic similarity to these reference populations, not self-identified
+    ethnicity or exact genealogical ancestry.
   </footer>
 
 <script>
+  // ---------------------------------------------------------------------
+  // Population display names (lookup table -- replaces raw 1000 Genomes
+  // codes like "PUR" or "GBR" with readable names in the UI).
+  // ---------------------------------------------------------------------
+  const POP_INFO = {
+    // AFR
+    YRI: { name: 'Yoruba', super: 'AFR' },
+    LWK: { name: 'Luhya', super: 'AFR' },
+    GWD: { name: 'Gambian', super: 'AFR' },
+    MSL: { name: 'Mende', super: 'AFR' },
+    ESN: { name: 'Esan', super: 'AFR' },
+    ASW: { name: 'African American (SW US)', super: 'AFR' },
+    ACB: { name: 'African Caribbean', super: 'AFR' },
+    // AMR
+    MXL: { name: 'Mexican', super: 'AMR' },
+    PUR: { name: 'Puerto Rican', super: 'AMR' },
+    CLM: { name: 'Colombian', super: 'AMR' },
+    PEL: { name: 'Peruvian', super: 'AMR' },
+    // EAS
+    CHB: { name: 'Han Chinese', super: 'EAS' },
+    JPT: { name: 'Japanese', super: 'EAS' },
+    CHS: { name: 'Southern Han Chinese', super: 'EAS' },
+    CDX: { name: 'Dai Chinese', super: 'EAS' },
+    KHV: { name: 'Kinh Vietnamese', super: 'EAS' },
+    // EUR
+    CEU: { name: 'Northern European', super: 'EUR' },
+    TSI: { name: 'Tuscan', super: 'EUR' },
+    FIN: { name: 'Finnish', super: 'EUR' },
+    GBR: { name: 'British', super: 'EUR' },
+    IBS: { name: 'Spanish', super: 'EUR' },
+    // SAS
+    GIH: { name: 'Gujarati Indian', super: 'SAS' },
+    PJL: { name: 'Punjabi', super: 'SAS' },
+    BEB: { name: 'Bengali', super: 'SAS' },
+    STU: { name: 'Sri Lankan Tamil', super: 'SAS' },
+    ITU: { name: 'Indian Telugu', super: 'SAS' },
+  };
+
+  const SUPER_INFO = {
+    AFR: 'African',
+    AMR: 'American (Admixed)',
+    EAS: 'East Asian',
+    EUR: 'European',
+    SAS: 'South Asian',
+  };
+
+  const SUPER_COLORS = {
+    AFR: '#e07a5f',
+    AMR: '#f2cc8f',
+    EAS: '#81b29a',
+    EUR: '#6ea8d9',
+    SAS: '#b5838d',
+  };
+
+  function popName(code) { return (POP_INFO[code] && POP_INFO[code].name) || code; }
+  function superName(code) { return SUPER_INFO[code] || code; }
+
+  // ---------------------------------------------------------------------
+  // Error message lookup -- friendlier text than a raw fetch/JSON error
+  // ---------------------------------------------------------------------
+  const ERROR_MESSAGES = {
+    insufficient_overlap: 'Not enough of your file matched the reference panel\u2019s SNPs. Check that this is a 23andMe/AncestryDNA raw export or a single-sample VCF.',
+    genome_build_mismatch: 'Your file\u2019s genome build may not match the reference panel (this model expects hg19). Re-export your data on the correct build if your provider offers one.',
+    malformed_upload: 'The uploaded file looks empty or unreadable.',
+    server_error: 'Something went wrong on the server while processing your file.',
+  };
+
   const dropEl = document.getElementById('drop');
   const fileInput = document.getElementById('file-input');
   const filenameEl = document.getElementById('filename');
@@ -256,6 +469,10 @@
   const statusEl = document.getElementById('status');
   const resultsEl = document.getElementById('results');
   const barsEl = document.getElementById('bars');
+  const popListEl = document.getElementById('pop-list');
+  const confidenceBadgeEl = document.getElementById('confidence-badge');
+  const confidenceNumericEl = document.getElementById('confidence-numeric');
+  const interpretationEl = document.getElementById('interpretation');
   const metaEl = document.getElementById('meta');
   const noteEl = document.getElementById('note');
   const scatterLegendEl = document.getElementById('scatter-legend');
@@ -265,6 +482,7 @@
   let selectedFile = null;
   let referenceSnps = null;
   let referenceScatter = null;
+  let popCentroids = null; // computed client-side from referenceScatter
 
   async function loadReferenceAssets() {
     try {
@@ -274,13 +492,37 @@
       ]);
       referenceSnps = new Set(snps);
       referenceScatter = scatter;
+      popCentroids = computeClientCentroids(scatter);
     } catch (err) {
       console.warn('Could not load reference assets:', err);
     }
   }
   loadReferenceAssets();
 
-  /** Keep only SNPs the model uses — shrinks ~600k-line exports to ~80k for upload. */
+  /** Lightweight client-side centroid computation (PC1/PC2 only, purely
+   * for visualization -- the real, full-dimensional centroids used for
+   * actual inference are precomputed offline and live in the backend
+   * model, not here). Just a groupBy + average over ~2,500 points. */
+  function computeClientCentroids(scatter) {
+    if (!scatter || !scatter.points || !scatter.pop_labels) return {};
+    const sums = {};
+    const counts = {};
+    scatter.points.forEach(([x, y], i) => {
+      const pop = scatter.pop_labels[i];
+      if (!sums[pop]) { sums[pop] = [0, 0]; counts[pop] = 0; }
+      sums[pop][0] += x;
+      sums[pop][1] += y;
+      counts[pop] += 1;
+    });
+    const centroids = {};
+    Object.keys(sums).forEach(pop => {
+      centroids[pop] = [sums[pop][0] / counts[pop], sums[pop][1] / counts[pop]];
+    });
+    return centroids;
+  }
+
+  /** Keep only SNPs the model uses — shrinks ~600k-line exports to a
+   * manageable upload size. */
   function filterToReferenceSnps(text) {
     if (!referenceSnps) return text;
     const lines = [];
@@ -312,32 +554,49 @@
     filenameEl.textContent = f.name;
     runBtn.disabled = false;
     statusEl.textContent = '';
-    statusEl.classList.remove('error');
+    statusEl.classList.remove('error', 'warn');
   }
 
   runBtn.addEventListener('click', async () => {
     if (!selectedFile) return;
     runBtn.disabled = true;
-    statusEl.classList.remove('error');
-    statusEl.textContent = 'Filtering SNPs and uploading…';
+    statusEl.classList.remove('error', 'warn');
+    statusEl.textContent = 'Filtering SNPs and uploading\u2026';
     resultsEl.classList.remove('show');
 
     try {
       const raw = await selectedFile.text();
-      const body = filterToReferenceSnps(raw);
-      const kept = body ? body.split('\n').filter(Boolean).length : 0;
-      if (kept < 500) {
-        statusEl.textContent = `Only ${kept} overlapping SNPs after filtering — check file format or genome build (hg19).`;
+      if (!raw || !raw.trim()) {
+        statusEl.textContent = ERROR_MESSAGES.malformed_upload;
         statusEl.classList.add('error');
         runBtn.disabled = false;
         return;
       }
-      statusEl.textContent = `Uploading ${kept.toLocaleString()} SNPs…`;
-      const resp = await fetch('/api/predict', { method: 'POST', body });
-      const data = await resp.json();
+
+      const body = filterToReferenceSnps(raw);
+      const kept = body ? body.split('\n').filter(Boolean).length : 0;
+      if (kept < 500) {
+        statusEl.textContent = `Only ${kept} overlapping SNPs after filtering. ${ERROR_MESSAGES.insufficient_overlap}`;
+        statusEl.classList.add('error');
+        runBtn.disabled = false;
+        return;
+      }
+      statusEl.textContent = `Uploading ${kept.toLocaleString()} SNPs\u2026`;
+
+      let resp, data;
+      try {
+        resp = await fetch('/api/predict', { method: 'POST', body });
+        data = await resp.json();
+      } catch (networkErr) {
+        statusEl.textContent = 'Could not reach the server. Check your connection and try again.';
+        statusEl.classList.add('error');
+        runBtn.disabled = false;
+        return;
+      }
 
       if (!resp.ok || data.error) {
-        statusEl.textContent = data.error || 'Something went wrong.';
+        const friendly = ERROR_MESSAGES[data.error_type] || data.error || 'Something went wrong.';
+        statusEl.textContent = friendly;
         statusEl.classList.add('error');
         runBtn.disabled = false;
         return;
@@ -353,57 +612,103 @@
     }
   });
 
-  const POP_LABELS = {
-    AFR: 'African', AMR: 'American', EAS: 'East Asian',
-    EUR: 'European', SAS: 'South Asian'
-  };
-
   function renderResults(data) {
-    barsEl.innerHTML = '';
-    const entries = Object.entries(data.ancestry_proportions)
-      .sort((a, b) => b[1] - a[1]);
+    renderContinentalBars(data.ancestry_proportions);
+    renderClosestPopulations(data.closest_populations);
+    renderConfidence(data.confidence);
+    renderInterpretation(data);
+    renderMeta(data);
+    noteEl.textContent = data.note;
+    drawScatter(data.pca_coordinates, data.closest_populations);
+    renderScatterLegend();
+    resultsEl.classList.add('show');
+  }
 
-    entries.forEach(([pop, frac]) => {
+  function renderContinentalBars(proportions) {
+    barsEl.innerHTML = '';
+    const entries = Object.entries(proportions).sort((a, b) => b[1] - a[1]);
+    entries.forEach(([code, frac]) => {
       const row = document.createElement('div');
       row.className = 'bar-row';
       row.innerHTML = `
-        <div>${POP_LABELS[pop] || pop}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(frac * 100).toFixed(1)}%"></div></div>
+        <div>${superName(code)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(frac * 100).toFixed(1)}%; background:linear-gradient(90deg, ${SUPER_COLORS[code]}88, ${SUPER_COLORS[code]})"></div></div>
         <div>${(frac * 100).toFixed(1)}%</div>
       `;
       barsEl.appendChild(row);
     });
+  }
 
+  function renderClosestPopulations(closestPopulations, limit = 6) {
+    popListEl.innerHTML = '';
+    const entries = Object.entries(closestPopulations)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit);
+    entries.forEach(([code, frac]) => {
+      const info = POP_INFO[code];
+      const row = document.createElement('div');
+      row.className = 'pop-row';
+      row.innerHTML = `
+        <div><span class="pop-name">${popName(code)}</span><span class="pop-code">${code}</span></div>
+        <div class="pop-super">${info ? superName(info.super) : ''}</div>
+        <div class="pop-pct">${(frac * 100).toFixed(1)}%</div>
+      `;
+      popListEl.appendChild(row);
+    });
+  }
+
+  function renderConfidence(confidence) {
+    const label = confidence.label || 'Low';
+    confidenceBadgeEl.textContent = label;
+    confidenceBadgeEl.className = 'confidence-badge ' + label.toLowerCase();
+    confidenceNumericEl.textContent = `score ${(confidence.score * 100).toFixed(0)}% \u00b7 top match ${confidence.top_ratio}\u00d7 stronger than runner-up`;
+  }
+
+  /** Auto-generated, deliberately hedged interpretation text -- frames
+   * everything as similarity to reference populations, never as a claim
+   * about the person's actual heritage or identity. */
+  function renderInterpretation(data) {
+    const contEntries = Object.entries(data.ancestry_proportions).sort((a, b) => b[1] - a[1]);
+    const popEntries = Object.entries(data.closest_populations).sort((a, b) => b[1] - a[1]);
+    const topContinent = contEntries[0];
+    const topPops = popEntries.slice(0, 2).map(([code]) => popName(code));
+    const confidenceLabel = data.confidence.label;
+
+    let text;
+    if (confidenceLabel === 'High') {
+      text = `This sample clusters strongly with ${superName(topContinent[0])} reference populations `
+           + `(${(topContinent[1] * 100).toFixed(0)}% of assigned similarity). `
+           + `The strongest similarities are to the ${topPops.join(' and ')} reference groups.`;
+    } else if (confidenceLabel === 'Medium') {
+      text = `This sample is most similar to ${superName(topContinent[0])} reference populations, `
+           + `particularly ${topPops.join(' and ')}, but shows meaningful similarity to other reference `
+           + `groups as well -- consistent with either genuine admixture or a genome that simply sits `
+           + `between the reference populations available here.`;
+    } else {
+      text = `This sample's similarity is spread across several reference populations, most notably `
+           + `${topPops.join(' and ')}, without a single dominant match. This pattern often indicates `
+           + `admixed ancestry, or ancestry from a population not well represented in the 1000 Genomes panel.`;
+    }
+    interpretationEl.textContent = text;
+  }
+
+  function renderMeta(data) {
     metaEl.innerHTML = `
-      <div><div class="k">Closest population</div><div class="v">${POP_LABELS[data.closest_population] || data.closest_population}</div></div>
-      <div><div class="k">Confidence</div><div class="v">${(data.confidence * 100).toFixed(1)}%</div></div>
       <div><div class="k">SNPs used</div><div class="v">${data.n_snps_used.toLocaleString()}</div></div>
       <div><div class="k">Reference panel size</div><div class="v">${data.n_snps_total_in_reference.toLocaleString()}</div></div>
+      <div><div class="k">Allele mismatches dropped</div><div class="v">${data.n_allele_mismatches_dropped.toLocaleString()}</div></div>
+      <div><div class="k">Nearest centroid distance</div><div class="v">${data.mean_neighbor_distance}</div></div>
     `;
-
-    noteEl.textContent = data.note;
-
-    drawScatter(data.pca_coordinates, referenceScatter);
-    renderScatterLegend();
-    resultsEl.classList.add('show');
   }
 
   function renderScatterLegend() {
     const pops = ['AFR', 'AMR', 'EAS', 'EUR', 'SAS'];
     scatterLegendEl.innerHTML = pops.map(pop => `
-      <span><i style="background:${POP_COLORS[pop]}; opacity:0.85"></i>${POP_LABELS[pop]}</span>
+      <span><i style="background:${SUPER_COLORS[pop]}; opacity:0.85"></i>${superName(pop)}</span>
     `).join('') + `<span><i class="you" style="background:#4fd1c5"></i>You</span>`;
   }
 
-  const POP_COLORS = {
-    AFR: '#e07a5f',
-    AMR: '#f2cc8f',
-    EAS: '#81b29a',
-    EUR: '#6ea8d9',
-    SAS: '#b5838d',
-  };
-
-  function drawScatter(userCoords, referenceScatter) {
+  function drawScatter(userCoords, closestPopulations) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#0a0f1c';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -421,7 +726,6 @@
       allX.push(userCoords[0]);
       allY.push(userCoords[1]);
     }
-
     if (!allX.length) return;
 
     const minX = Math.min(...allX);
@@ -458,24 +762,66 @@
     ctx.fillText('PC1', canvas.width - pad - 18, axisY0 + 14);
     ctx.fillText('PC2', axisX1 + 8, pad + 4);
 
-    // reference cloud
+    // reference cloud (faint individual samples)
     refPoints.forEach(([x, y], i) => {
       const [cx, cy] = toCanvas([x, y]);
       const pop = refLabels[i];
-      ctx.fillStyle = POP_COLORS[pop] || '#5b6588';
-      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = SUPER_COLORS[pop] || '#5b6588';
+      ctx.globalAlpha = 0.3;
       ctx.beginPath();
-      ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.globalAlpha = 1;
 
-    // user point
-    if (userCoords?.length === 2) {
-      const [ux, uy] = toCanvas(userCoords);
+    // highlight the top-3 closest detailed-population centroids
+    const topPops = Object.entries(closestPopulations || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([code]) => code);
+
+    const userCanvasXY = userCoords?.length === 2 ? toCanvas(userCoords) : null;
+
+    topPops.forEach((code, rank) => {
+      const centroid = popCentroids && popCentroids[code];
+      if (!centroid) return;
+      const [cx, cy] = toCanvas(centroid);
+      const info = POP_INFO[code];
+      const color = info ? SUPER_COLORS[info.super] : '#eef1f7';
+
+      // faint connecting line from user to this centroid
+      if (userCanvasXY) {
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = rank === 0 ? 0.55 : 0.3;
+        ctx.lineWidth = rank === 0 ? 1.6 : 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(userCanvasXY[0], userCanvasXY[1]);
+        ctx.lineTo(cx, cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+
+      // centroid ring
+      ctx.strokeStyle = color;
+      ctx.lineWidth = rank === 0 ? 2.5 : 1.5;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rank === 0 ? 9 : 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = '#eef1f7';
+      ctx.font = rank === 0 ? 'bold 11px monospace' : '10px monospace';
+      ctx.fillText(code, cx + 10, cy - 6);
+    });
+
+    // user point, drawn last so it's on top
+    if (userCanvasXY) {
       ctx.fillStyle = '#4fd1c5';
       ctx.beginPath();
-      ctx.arc(ux, uy, 7, 0, Math.PI * 2);
+      ctx.arc(userCanvasXY[0], userCanvasXY[1], 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#0d1321';
       ctx.lineWidth = 2;
@@ -483,7 +829,7 @@
 
       ctx.fillStyle = '#eef1f7';
       ctx.font = '12px monospace';
-      ctx.fillText('you', ux + 10, uy + 4);
+      ctx.fillText('you', userCanvasXY[0] + 10, userCanvasXY[1] + 4);
     }
   }
 </script>

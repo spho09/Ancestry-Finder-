@@ -268,3 +268,35 @@ Ancestry-Finder-/
 - [ ] Connect GitHub in Vercel (failed first time — needs GitHub login connection in Vercel account settings)
 - [ ] Add reference PC scatter to frontend
 - [ ] Finer-grained population labels beyond super-populations
+
+---
+
+## Future improvements (not required now, left as TODOs in code)
+
+- **Larger reference panel**: 1000 Genomes (2,504 samples) is a good starting
+  point but under-represents many world populations. HGDP (Human Genome
+  Diversity Project, ~1,000 samples, more geographically diverse) or a
+  1000G + HGDP merge would improve coverage. Would require re-running
+  `offline/build_reference_model.py` against the merged panel.
+- **ADMIXTURE-style modeling**: the current inference (RBF/Gaussian
+  similarity to PCA centroids) is a fast proxy for population membership.
+  A true ADMIXTURE run (explicit generative model of allele frequencies
+  under k-way admixture) would give more rigorous ancestry proportions,
+  at the cost of needing to run offline (ADMIXTURE is a separate compiled
+  tool, not something to run per-request in a serverless function).
+- **Full covariance instead of scalar spread**: `pop_spread` is currently
+  one number per population (isotropic). A full covariance matrix per
+  population (Mahalanobis distance) would better capture populations
+  whose genetic variation isn't equally spread in every PCA direction —
+  1000 Genomes' smaller populations (60-100 samples) are borderline for
+  estimating a stable 20x20 covariance matrix, which is why this version
+  uses a scalar.
+- **UMAP visualization**: PCA is used for both inference and the on-page
+  scatter plot. A separate UMAP embedding (fit only for visualization,
+  not inference) can show cluster structure more clearly than PC1/PC2
+  alone, since it isn't limited to linear projections.
+- **Confidence intervals / bootstrap uncertainty**: current confidence is
+  a single entropy-based score. Bootstrapping over random SNP subsets
+  (re-run projection+scoring on e.g. 100 resamples of the SNP set) would
+  give an actual uncertainty range around each population's probability,
+  rather than one point estimate.

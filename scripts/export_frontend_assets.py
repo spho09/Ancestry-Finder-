@@ -1,4 +1,16 @@
-"""Export static frontend assets from api/model/reference_model.npz."""
+"""Export static frontend assets from api/model/reference_model.npz.
+
+Two files go into public/:
+  reference_snps.json     -- list of rsIDs the model uses (lets the
+                              frontend pre-filter a huge raw export client-
+                              side before uploading it)
+  reference_scatter.json  -- PC1/PC2 for every reference sample, with BOTH
+                              continental (super_pop) and detailed (pop)
+                              labels, so the frontend can draw the
+                              background cloud AND compute/highlight
+                              detailed-population centroids (e.g. "GBR",
+                              "PUR") without any extra backend work.
+"""
 import json
 import os
 import sys
@@ -15,7 +27,8 @@ def main():
         snps = m["snp_ids"].tolist()
         scatter = {
             "points": m["ref_pcs"][:, :2].tolist(),
-            "labels": m["ref_super_pop"].tolist(),
+            "labels": m["ref_super_pop"].tolist(),      # continental, e.g. "EUR"
+            "pop_labels": m["ref_pop"].tolist(),         # detailed, e.g. "GBR"
         }
     os.makedirs(PUBLIC, exist_ok=True)
     snp_path = os.path.join(PUBLIC, "reference_snps.json")
