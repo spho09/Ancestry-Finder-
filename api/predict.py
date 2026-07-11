@@ -141,32 +141,102 @@ def project_and_classify(dosage: np.ndarray, model: dict):
     pca_components = model["pca_components"]
     ref_pcs = model["ref_pcs"]
     ref_super_pop = model["ref_super_pop"]
+    ref_pop = model["ref_pop"]
 
+    # Project uploaded sample into PCA space
     user_pcs = (dosage - pca_mean) @ pca_components.T
 
-    dists = np.linalg.norm(ref_pcs - user_pcs[np.newaxis, :], axis=1)
-    nn_idx = np.argsort(dists)[:K_NEIGHBORS]
-    nn_dists = dists[nn_idx]
-    nn_labels = ref_super_pop[nn_idx]
+    # ----------------------------------------------------
+    # Build a centroid for every reference population
+    # ----------------------------------------------------
+    population_centroids = {}
 
-    weights = 1.0 / (nn_dists + 1e-6)
-    weights /= weights.sum()
+    for pop in np.unique(ref_pop):
+        mask = ref_pop == pop
+        population_centroids[pop] = ref_pcs[mask].mean(axis=0)
 
-    proportions = {}
-    for label, w in zip(nn_labels, weights):
-        proportions[label] = proportions.get(label, 0.0) + float(w)
+    # ----------------------------------------------------
+    # Distance from user to each population centroid
+    # ----------------------------------------------------
+    population_scores = {}
 
-    closest_population = max(proportions, key=proportions.get)
-    top_share = proportions[closest_population]
+    for pop, centroid in population_centroids.items():
+        dist = np.linalg.norm(user_pcs - centroid)
+
+        # Similarity instead of raw distance
+        score = np.exp(-dist)
+
+        population_scores[pop] = score
+
+    # Normalize to probabilities
+    total = sum(population_scores.values())
+
+    if total == 0:
+        total = 1.0
+
+    for pop in population_scores:
+        population_scores[pop] /= total
+
+    # ----------------------------------------------------
+    # Aggregate into continental groups
+    # ----------------------------------------------------
+    population_to_super = {}
+
+    for pop, super_pop in zip(ref_pop, ref_super_pop):
+        if pop not in population_to_super:
+            population_to_super[pop] = super_pop
+
+    continent_scores = {}
+
+    for pop, score in population_scores.items():
+        super_pop = population_to_super[pop]
+        continent_scores[super_pop] = (
+            continent_scores.get(super_pop, 0.0) + score
+        )
+
+    # ----------------------------------------------------
+    # Find closest population
+    # ----------------------------------------------------
+    closest_population = max(
+        population_scores,
+        key=population_scores.get
+    )
+
+    confidence = population_scores[closest_population]
+
+    # Distance to nearest reference individual
+    dists = np.linalg.norm(
+        ref_pcs - user_pcs[np.newaxis, :],
+        axis=1
+    )
 
     return {
         "pca_coordinates": user_pcs[:2].tolist(),
-        "ancestry_proportions": {k: round(v, 4) for k, v in proportions.items()},
-        "closest_population": closest_population,
-        "confidence": round(float(top_share), 3),
-        "mean_neighbor_distance": round(float(nn_dists.mean()), 3),
-    }
 
+        "ancestry_proportions": {
+            k: round(v, 4)
+            for k, v in sorted(
+                continent_scores.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+        },
+
+        "closest_population": closest_population,
+
+        "closest_populations": {
+            k: round(v, 4)
+            for k, v in sorted(
+                population_scores.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )[:10]
+        },
+
+        "confidence": round(float(confidence), 3),
+
+        "mean_neighbor_distance": round(float(dists.min()), 3),
+    }
 
 def handle_request(body: bytes) -> dict:
     model = load_model()
