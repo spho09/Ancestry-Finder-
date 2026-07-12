@@ -105,7 +105,7 @@ TOP_K_CANDIDATES = 10
 # are much larger (~0.2-0.4) -- see module tests. A weight of 100 makes
 # the likelihood stage decisive between close candidates without letting
 # it swing wildly on noise from a handful of SNPs.
-LIKELIHOOD_WEIGHT = 100.0
+LIKELIHOOD_WEIGHT = 2.0
 
 _model = None  # lazy-loaded, cached across warm invocations
 
