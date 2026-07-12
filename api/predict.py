@@ -367,6 +367,56 @@ def find_candidate_populations(user_pcs: np.ndarray, model: dict, top_k: int = T
     return pca_prior_prob, pca_log_prior, pca_distances, candidate_codes
 
 
+def compute_combination_prior(pca_distances: dict, candidate_codes: list, model: dict) -> dict:
+    """A second, GENTLER PCA-based prior, used only in the final
+    combination step (combine_pca_and_likelihood_scores) -- distinct from
+    the per-population-spread-normalized prior above, which is fine for
+    candidate SELECTION but actively wrong to use as a final weighting
+    term. Here's why these need to be different:
+
+    BUG THIS FIXES: the harsh, per-population-spread RBF divides by that
+    population's own spread^2. Tight, historically isolated populations
+    (e.g. CHB/CHS/KHV, spread ~10-13) have a very narrow "acceptance
+    window" -- a sample needs to sit almost exactly at their centroid to
+    score well. Diffuse, admixed populations (e.g. MXL/ASW, spread
+    ~36-49) have a much wider one. For an in-training-set sample (which
+    sits at ~zero distance from its own true population's centroid) this
+    doesn't matter. For a genuinely new, real-world upload -- which
+    normally sits at a real, nonzero distance from every centroid -- this
+    bandwidth disparity can completely dominate: a tight population that
+    is geometrically the CLOSEST match can still get an almost-zero prior
+    simply for not being close enough, while a diffuse population that is
+    much farther away gets a comfortable one. This is disproportionate to
+    the actual signal and can overwhelm the (usually more reliable)
+    allele-frequency likelihood stage entirely -- confirmed on a real
+    AncestryDNA upload where the true ancestry was ~100% East Asian:
+    KHV/CHS/CHB were the 3 geometrically closest populations of all 26,
+    yet the harsh prior ranked them dead last among the 10 PCA
+    candidates, while the allele-frequency likelihood (unaffected by this
+    issue) correctly still favored them.
+
+    The fix: use ONE SHARED bandwidth (the median spread across all 26
+    populations, precomputed offline as `global_bandwidth`) for this
+    prior, instead of each population's own idiosyncratic spread. This
+    keeps real distance information in the prior (a genuinely closer
+    population still gets a higher prior than a farther one) without the
+    tight-vs-diffuse disparity distorting it by orders of magnitude. The
+    per-population-spread version is still used, unchanged, for candidate
+    SELECTION (find_candidate_populations) and for the frontend's
+    "population_distances" debug view -- both of those are fine with it,
+    since selection only needs good recall (not excluding the true
+    answer), which it already has.
+    """
+    global_bandwidth = float(model["global_bandwidth"])
+    log_sim = {
+        code: -(pca_distances[code] ** 2) / (2 * global_bandwidth ** 2)
+        for code in candidate_codes
+    }
+    m = max(log_sim.values())
+    log_norm = m + math.log(sum(math.exp(v - m) for v in log_sim.values()))
+    return {code: v - log_norm for code, v in log_sim.items()}
+
+
 # ---------------------------------------------------------------------------
 # Stage 3: refine candidates with an allele-frequency genotype likelihood
 # ---------------------------------------------------------------------------
@@ -418,17 +468,20 @@ def compute_population_likelihoods(dosage: np.ndarray, observed_mask: np.ndarray
 # Stage 4: combine PCA prior and allele-frequency likelihood
 # ---------------------------------------------------------------------------
 
-def combine_pca_and_likelihood_scores(pca_log_prior: dict, mean_loglik: dict, candidate_codes: list) -> dict:
+def combine_pca_and_likelihood_scores(combination_prior: dict, mean_loglik: dict, candidate_codes: list) -> dict:
     """Bayesian-style combination in log space: log(posterior) is
-    proportional to log(prior) + log(likelihood). Here the PCA stage
-    supplies the prior (candidates outside the PCA-selected set implicitly
-    get zero posterior -- they were pruned in stage 2) and the allele-
-    frequency stage supplies the likelihood, scaled by LIKELIHOOD_WEIGHT.
-    Softmax-normalizing the combined scores over just the candidate set
-    turns them into a proper probability distribution.
+    proportional to log(prior) + log(likelihood). `combination_prior`
+    should be the GENTLE, shared-bandwidth prior from
+    compute_combination_prior -- not the harsh per-population-spread
+    prior from find_candidate_populations, which is only appropriate for
+    candidate selection (see that function's docstring). Candidates
+    outside the PCA-selected set implicitly get zero posterior -- they
+    were pruned in stage 2. Softmax-normalizing the combined scores over
+    just the candidate set turns them into a proper probability
+    distribution.
     """
     combined_log_score = {
-        code: pca_log_prior[code] + LIKELIHOOD_WEIGHT * mean_loglik[code]
+        code: combination_prior[code] + LIKELIHOOD_WEIGHT * mean_loglik[code]
         for code in candidate_codes
     }
     scores = np.array([combined_log_score[c] for c in candidate_codes])
@@ -593,14 +646,20 @@ def handle_request(body: bytes) -> dict:
     # Stage 1: PCA projection
     user_pcs = project_sample(dosage, model)
 
-    # Stage 2: PCA-based candidate narrowing (coarse, fast filter)
+    # Stage 2: PCA-based candidate narrowing (coarse, fast filter -- the
+    # harsh per-population-spread prior is fine here, it only needs good
+    # recall, which it has)
     pca_prior_prob, pca_log_prior, pca_distances, candidate_codes = find_candidate_populations(user_pcs, model)
 
     # Stage 3: allele-frequency genotype likelihood, candidates only
     mean_loglik = compute_population_likelihoods(dosage, observed_mask, candidate_codes, model)
 
-    # Stage 4: combine into final population probabilities
-    pop_probabilities = combine_pca_and_likelihood_scores(pca_log_prior, mean_loglik, candidate_codes)
+    # Stage 4: combine into final population probabilities. Uses a
+    # GENTLER, shared-bandwidth prior here (not pca_log_prior from stage
+    # 2) -- see compute_combination_prior's docstring for why the harsh
+    # per-population-spread prior is wrong for this specific step.
+    combination_prior = compute_combination_prior(pca_distances, candidate_codes, model)
+    pop_probabilities = combine_pca_and_likelihood_scores(combination_prior, mean_loglik, candidate_codes)
 
     # Stage 5: aggregate + confidence
     continental = aggregate_superpopulations(pop_probabilities, model)

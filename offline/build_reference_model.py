@@ -273,6 +273,14 @@ def main():
         pop_allele_freq=pop_allele_freq.astype(np.float32),
         pop_to_super=np.array(pop_to_super, dtype="<U8"),
         superpop_codes=np.array(superpop_codes, dtype="<U8"),
+        # a single shared RBF bandwidth (median of all populations' own
+        # spreads), used ONLY as the prior in the final PCA+likelihood
+        # combination step (see predict.py combine_pca_and_likelihood_scores).
+        # NOT used for candidate selection, where per-population spread
+        # (pop_spread) is still correct and unchanged -- see that
+        # function's docstring for why these two uses need different
+        # bandwidths.
+        global_bandwidth=np.float32(np.median(pop_spread)),
     )
     print(f"Wrote {OUT_PATH}")
     print(f"  {ref_pcs.shape[0]} samples, {len(snp_ids)} SNPs, {N_COMPONENTS} PCs, {len(pop_codes)} populations")
