@@ -99,12 +99,25 @@ MIN_SNPS_REQUIRED = 500  # below this, results are too noisy to report
 TOP_K_CANDIDATES = 12
 
 # How strongly the allele-frequency likelihood can move the final
-# probabilities relative to the PCA prior. Chosen empirically: per-SNP
-# mean log-likelihood differences between genuinely close populations are
-# small (~0.01-0.05) while differences between clearly-wrong populations
-# are much larger (~0.2-0.4) -- see module tests. A weight of 100 makes
-# the likelihood stage decisive between close candidates without letting
-# it swing wildly on noise from a handful of SNPs.
+# probabilities relative to the PCA prior.
+#
+# VALIDATED (offline/validate_loo.py, full 2,504-sample leave-one-out
+# panel, not a single upload): across weight in {0.5, 1, 2, 3, 4, 6, 8}
+# and top_k in {8, 12, 16, 20}, population-level accuracy stayed in a
+# 0.841-0.844 band and superpopulation accuracy stayed at 0.993 --
+# i.e. within this reference panel, this hyperparameter has NO measurable
+# effect. That's expected, not a bug: a reference-panel sample, even with
+# its own population's stats recomputed to exclude it, still sits
+# essentially at that population's centroid, so the PCA prior alone
+# already gets it right almost every time regardless of how much weight
+# the likelihood term carries. This hyperparameter matters for genuinely
+# novel uploads that don't sit near any single reference centroid (see
+# compute_combination_prior's AMR-bias discussion) -- a case leave-one-out
+# on reference samples structurally cannot test. Keeping the previous
+# value (2.0) because nothing in the validation data justifies changing
+# it. Do not retune this against a single uploaded sample's output --
+# see offline/validate_loo.py's docstring for why, and run it (aggregate
+# accuracy across the full panel) before changing this value again.
 LIKELIHOOD_WEIGHT = 2.0
 
 _model = None  # lazy-loaded, cached across warm invocations

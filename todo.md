@@ -323,22 +323,56 @@ set of discrete candidate populations once, via closed-form vectorized
 NumPy, with no optimizer and no new dependency, to stay within a
 serverless time/memory budget.
 
-**Validation:** re-ran the 10-sample known-ancestry test suite (see
-`test_data/`). Continent-level accuracy: 9/10 (unchanged). Detailed-
-population accuracy: improved from 8/10 to 9/10. Runtime: ~150-200ms
-per request warm, ~350ms cold -- well within the 3s target.
+**Validation (superseded, see below):** the original check here was the
+10-sample `test_data/` suite, which is in-sample (those samples' own
+genotypes helped build the centroids/frequencies they were being scored
+against) -- optimistic and not a real generalization estimate. It was
+also, at one point, informally "validated" by comparing one real upload's
+output to a commercial DNA test's report and hand-tuning constants until
+the two looked similar. **Don't do that again** -- different reference
+panel (26 populations vs. a commercial proprietary panel with hundreds),
+different algorithm (PCA+likelihood vs. chromosome painting), and no way
+to know the commercial tool's own error bars. That approach tunes to
+noise in a single sample, not to a real bug, and was never validated
+against a second sample.
 
-**Important limitation on this validation:** the 10 test samples are
-individuals who WERE part of the 2,504-sample reference panel used to
-build the model (their genotypes contributed to the population centroids,
-spreads, and allele frequencies they're being compared against). This is
-in-sample accuracy, not held-out/generalization accuracy, and will be
-somewhat optimistic relative to how the model performs on a genuinely new
-genome. A rigorous validation would re-run `build_reference_model.py`
-with each test sample's population excluded (leave-one-out), which is a
-larger undertaking than in-sample testing and hasn't been done here.
-TODO(future work): implement leave-one-out validation for a proper
-generalization estimate.
+**Real validation (offline/validate_loo.py) -- leave-one-out on the full
+2,504-sample panel, ground truth = each sample's actual 1000 Genomes
+population label:**
+
+- Superpopulation (continental) accuracy: **99.3%** (2,486 / 2,504)
+- Detailed-population accuracy: **84.7%** (2,121 / 2,504)
+- Per-superpopulation detailed accuracy: EAS 91.9%, AFR 85.8%, EUR 84.7%,
+  AMR 83.3%, SAS 76.9%
+- Errors are concentrated almost entirely between genetically/
+  geographically adjacent sibling populations, not scattered randomly --
+  e.g. ITU↔STU (both Indian Telugu/Sri Lankan Tamil in the UK), GBR↔CEU
+  (British vs. Utah residents of European descent), CHB↔CHS (Han
+  Chinese Beijing vs. South), ASW↔ACB↔YRI (African-American/Caribbean/
+  Yoruba). This is the expected ceiling for genuinely similar
+  populations at this SNP density, not a bug.
+- Grid search over LIKELIHOOD_WEIGHT (0.5-8) x TOP_K_CANDIDATES (8-20):
+  **no combination moved accuracy meaningfully** (population accuracy
+  stayed in a 0.841-0.844 band, superpopulation accuracy stayed at
+  0.993). Kept LIKELIHOOD_WEIGHT at its previous value (2.0) since
+  nothing in this data justifies changing it -- see the comment above
+  `LIKELIHOOD_WEIGHT` in `api/predict.py`.
+
+**Limitation that still applies:** this is still leave-one-out on
+reference-panel *members*, not truly novel genomes. A held-out sample's
+own population statistics exclude it, but the sample still sits at
+roughly its population's location (it's a real member of that cluster).
+This validates "does the model correctly recognize samples that resemble
+one of the 26 reference populations" -- it does NOT validate behavior on
+genomes that don't resemble any of them well (the AMR-bias case
+described in `compute_combination_prior`'s docstring), since no such
+labeled sample exists in this panel to test against. That's a structural
+gap that only a larger/more diverse reference panel (HGDP merge) can
+close, not something this validation script or hyperparameter tuning can
+fix.
+
+Runtime: ~150-200ms per request warm, ~350ms cold -- well within the 3s
+target (unaffected by this validation work, which is entirely offline).
 
 **On the "American" bias:** the AMR populations (MXL/PUR/CLM/PEL) have
 the widest PCA spread of any group in the panel because they're
