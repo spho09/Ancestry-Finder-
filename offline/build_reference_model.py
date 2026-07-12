@@ -141,6 +141,37 @@ def compute_population_statistics(ref_pcs: np.ndarray, pop: np.ndarray, super_po
     return pop_codes, pop_centroids, pop_spread, pop_to_super, superpop_codes
 
 
+def compute_population_allele_frequencies(geno: np.ndarray, pop: np.ndarray, pop_codes: np.ndarray) -> np.ndarray:
+    """Precompute, per reference population, the alt-allele frequency at
+    every SNP -- (n_pops, n_snps). This is the piece borrowed conceptually
+    from AEON: modeling ancestry via allele frequencies and Hardy-Weinberg
+    genotype probabilities, rather than PCA distance alone. predict.py
+    uses this array to score how well an uploaded sample's *observed*
+    genotypes fit each candidate population's actual allele frequencies --
+    a refinement step on top of (not a replacement for) the PCA stage.
+
+    Small-sample smoothing: some 1000 Genomes populations have as few as
+    ~60-90 members, so a handful of SNPs can land at exactly 0% or 100%
+    frequency by chance. An unsmoothed 0 or 1 would make the Hardy-Weinberg
+    genotype likelihood collapse to exactly zero (log-likelihood -inf) for
+    any sample carrying the "wrong" allele there -- one unlucky SNP could
+    veto an entire population. We apply a small Laplace-style pseudo-count
+    (+1 allele / +2 total) so frequencies stay strictly inside (0, 1).
+    """
+    n_pops = len(pop_codes)
+    n_snps = geno.shape[1]
+    pop_allele_freq = np.zeros((n_pops, n_snps), dtype=np.float32)
+
+    for i, code in enumerate(pop_codes):
+        mask = pop == code
+        n_members = int(mask.sum())
+        alt_count_sum = geno[mask].sum(axis=0)  # sum of dosages (0/1/2) across members
+        # Laplace smoothing: (observed alt alleles + 1) / (total alleles + 2)
+        pop_allele_freq[i] = (alt_count_sum + 1.0) / (2 * n_members + 2.0)
+
+    return pop_allele_freq
+
+
 def main():
     print("Loading PLINK fileset...")
     geno, bim, fam = load_plink(BED_PREFIX)
@@ -175,6 +206,19 @@ def main():
         fill = (2 * freq)[np.newaxis, :]
         geno = np.where(nan_mask, np.broadcast_to(fill, geno.shape), geno)
 
+    # ---- attach population labels (needed now, before standardization
+    # destroys the raw dosage values we need for per-population allele freq) ----
+    panel = pd.read_csv(PANEL_FILE, sep="\t")
+    panel.columns = [c.strip() for c in panel.columns]
+    panel = panel.set_index(panel.columns[0])
+    super_pop = panel.loc[sample_ids, "super_pop"].values.astype(str)
+    pop = panel.loc[sample_ids, "pop"].values.astype(str)
+
+    # ---- per-population allele frequencies (AEON-inspired refinement input) ----
+    print("Computing per-population allele frequencies...")
+    pop_codes_tmp = np.array(sorted(set(pop.tolist())))
+    pop_allele_freq = compute_population_allele_frequencies(geno, pop, pop_codes_tmp)
+
     # ---- standardize (Patterson et al. scaling used by EIGENSOFT/smartpca) ----
     p = freq
     denom = np.sqrt(2 * p * (1 - p))
@@ -195,13 +239,6 @@ def main():
     pca_components = pca.components_ / denom[np.newaxis, :]
     pca_mean = mean
 
-    # ---- attach population labels ----
-    panel = pd.read_csv(PANEL_FILE, sep="\t")
-    panel.columns = [c.strip() for c in panel.columns]
-    panel = panel.set_index(panel.columns[0])
-    super_pop = panel.loc[sample_ids, "super_pop"].values.astype(str)
-    pop = panel.loc[sample_ids, "pop"].values.astype(str)
-
     print("Explained variance ratio (first 5 PCs):", pca.explained_variance_ratio_[:5])
 
     # ---- precompute population centroids / spread / superpop mapping ----
@@ -209,6 +246,7 @@ def main():
     pop_codes, pop_centroids, pop_spread, pop_to_super, superpop_codes = (
         compute_population_statistics(ref_pcs, pop, super_pop)
     )
+    assert list(pop_codes) == list(pop_codes_tmp), "population ordering must match pop_allele_freq rows"
     for code, spread, sup in zip(pop_codes, pop_spread, pop_to_super):
         n = int((pop == code).sum())
         print(f"  {code:>4} ({sup})  n={n:4d}  spread={spread:.2f}")
@@ -232,6 +270,7 @@ def main():
         pop_codes=np.array(pop_codes, dtype="<U8"),
         pop_centroids=pop_centroids.astype(np.float32),
         pop_spread=pop_spread.astype(np.float32),
+        pop_allele_freq=pop_allele_freq.astype(np.float32),
         pop_to_super=np.array(pop_to_super, dtype="<U8"),
         superpop_codes=np.array(superpop_codes, dtype="<U8"),
     )

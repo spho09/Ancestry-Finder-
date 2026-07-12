@@ -300,3 +300,57 @@ Ancestry-Finder-/
   (re-run projection+scoring on e.g. 100 resamples of the SNP set) would
   give an actual uncertainty range around each population's probability,
   rather than one point estimate.
+
+---
+
+## Hybrid PCA + allele-frequency pipeline (this update)
+
+**What changed:** inference is now two-stage. PCA still projects and does a
+fast first-pass similarity ranking (unchanged from before), but its output
+is now treated as a *prior* over candidate populations (top 10 of 26),
+which gets refined by a Hardy-Weinberg genotype-likelihood score computed
+from precomputed per-population allele frequencies (new offline artifact:
+`pop_allele_freq`, (26, n_snps)). The two signals are combined via
+Bayes' rule in log-space and softmax-normalized. See `api/predict.py`'s
+module docstring for the full writeup.
+
+**Conceptually borrowed from AEON** (github.com/[aeon project], not
+copied): modeling ancestry via allele frequencies and Hardy-Weinberg
+genotype probabilities, rather than PCA distance alone. AEON fits a
+continuous admixture-proportion vector via gradient-based MLE (Pyro/
+PyTorch, SVI/MCMC) -- this project instead scores a small, PCA-narrowed
+set of discrete candidate populations once, via closed-form vectorized
+NumPy, with no optimizer and no new dependency, to stay within a
+serverless time/memory budget.
+
+**Validation:** re-ran the 10-sample known-ancestry test suite (see
+`test_data/`). Continent-level accuracy: 9/10 (unchanged). Detailed-
+population accuracy: improved from 8/10 to 9/10. Runtime: ~150-200ms
+per request warm, ~350ms cold -- well within the 3s target.
+
+**Important limitation on this validation:** the 10 test samples are
+individuals who WERE part of the 2,504-sample reference panel used to
+build the model (their genotypes contributed to the population centroids,
+spreads, and allele frequencies they're being compared against). This is
+in-sample accuracy, not held-out/generalization accuracy, and will be
+somewhat optimistic relative to how the model performs on a genuinely new
+genome. A rigorous validation would re-run `build_reference_model.py`
+with each test sample's population excluded (leave-one-out), which is a
+larger undertaking than in-sample testing and hasn't been done here.
+TODO(future work): implement leave-one-out validation for a proper
+generalization estimate.
+
+**On the "American" bias:** the AMR populations (MXL/PUR/CLM/PEL) have
+the widest PCA spread of any group in the panel because they're
+themselves admixed -- this made PCA-only inference prone to defaulting
+ambiguous or out-of-panel genomes toward AMR, since a wide cluster
+accepts a wider range of points. The allele-frequency likelihood stage is
+a different signal (genotype fit, not projection distance) and isn't
+subject to the same bias, so it can and does pull probability away from
+AMR when the genotype evidence doesn't support it. This can't be fully
+validated against genomes truly outside 1000 Genomes' coverage (Central
+Asian, Siberian, Middle Eastern, North African) since no such samples
+exist in this reference panel to test against -- that's a structural
+limitation of the reference panel itself, not something the inference
+algorithm can fix. Expanding the reference panel (see earlier TODO on
+HGDP integration) is the real fix for that gap.
