@@ -96,7 +96,7 @@ MIN_SNPS_REQUIRED = 500  # below this, results are too noisy to report
 # likelihood stage's cost bounded and its output interpretable (we don't
 # want to report tiny nonzero "candidate" probability for populations PCA
 # already confidently rules out).
-TOP_K_CANDIDATES = 10
+TOP_K_CANDIDATES = 12
 
 # How strongly the allele-frequency likelihood can move the final
 # probabilities relative to the PCA prior. Chosen empirically: per-SNP
