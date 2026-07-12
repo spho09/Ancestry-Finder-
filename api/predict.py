@@ -132,18 +132,56 @@ def load_model() -> dict:
 # Parsing the uploaded file
 # ---------------------------------------------------------------------------
 
-def _parse_23andme_line(line: str, id_to_idx: dict, calls: dict) -> None:
+# Only single-base SNP alleles are usable by this model (no indels).
+# Filtering to this set also doubles as no-call handling: AncestryDNA
+# marks no-calls as "0" per allele, 23andMe marks them as "--" (which
+# becomes two "-" characters once split) -- neither "0" nor "-" is in
+# this set, so both formats' no-calls are naturally rejected by the same
+# check, with no special-casing needed.
+_VALID_BASES = {"A", "C", "G", "T"}
+
+
+def _parse_raw_text_line(line: str, id_to_idx: dict, calls: dict) -> None:
+    """Parses one data line from a 23andMe-style OR AncestryDNA-style raw
+    text export.
+
+    23andMe format -- 4 columns, alleles COMBINED in one field:
+        rsid    chromosome  position    genotype
+        rs4477212   1       82154       AA
+
+    AncestryDNA format -- 5 columns, alleles in TWO SEPARATE fields:
+        rsid    chromosome  position    allele1 allele2
+        rs4477212   1       82154       A       A
+
+    BUG THIS FIXES: the previous version only handled the 4-column case.
+    For a 5-column AncestryDNA line, parts[3] is a single character (just
+    allele1), so the old `len(genotype) == 2` check always failed and the
+    line was silently dropped -- for every row in a real AncestryDNA
+    file, producing ~0 matched SNPs.
+    """
     parts = line.split("\t")
     if len(parts) < 4:
         parts = line.split(",")
     if len(parts) < 4:
         return
-    rsid = parts[0]
+
+    rsid = parts[0].strip()
     if id_to_idx.get(rsid) is None:
         return
-    genotype = parts[3].replace("-", "")
-    if len(genotype) == 2:
-        calls[rsid] = (genotype[0], genotype[1])
+
+    if len(parts) >= 5:
+        # AncestryDNA-style: two separate single-allele columns
+        a1 = parts[3].strip().upper()
+        a2 = parts[4].strip().upper()
+    else:
+        # 23andMe-style: alleles combined into one column
+        combined = parts[3].strip().upper()
+        if len(combined) != 2:
+            return
+        a1, a2 = combined[0], combined[1]
+
+    if a1 in _VALID_BASES and a2 in _VALID_BASES:
+        calls[rsid] = (a1, a2)
 
 
 def _parse_vcf_line(line: str, id_to_idx: dict, calls: dict) -> None:
@@ -172,14 +210,25 @@ def _parse_vcf_line(line: str, id_to_idx: dict, calls: dict) -> None:
         calls[rsid] = (a1, a2)
 
 
-def parse_upload(body: bytes, model: dict) -> dict:
+def parse_upload(body: bytes, model: dict):
     """Parse only SNPs present in the reference panel (single pass, low
     memory). Supports 23andMe/AncestryDNA raw text and single-sample VCF,
-    auto-detected from the first non-empty line."""
+    auto-detected from the first non-empty line.
+
+    Returns (calls, diagnostics). `calls` only ever contains rsIDs that
+    matched the reference panel (matching happens inline, during parsing,
+    for memory efficiency on large files) -- so a separate `n_parsed`
+    counter is tracked here too, to distinguish "the file had rows but
+    none matched the reference panel" from "the file had almost no
+    syntactically valid rows at all." Those point to different root
+    causes (rsID/build mismatch vs. a parser/format bug) and mixing them
+    up made this exact bug harder to diagnose."""
     id_to_idx = model["id_to_idx"]
     calls = {}
     is_vcf = False
     header_checked = False
+    n_parsed = 0
+    parsed_sample = []
 
     for raw_line in body.splitlines():
         if not raw_line:
@@ -192,13 +241,45 @@ def parse_upload(body: bytes, model: dict) -> dict:
             header_checked = True
         if line.startswith("#"):
             continue
+
+        # count syntactically-valid data rows regardless of reference
+        # match, for the "parser bug vs. no overlap" diagnostic below
+        parts = line.split("\t") if "\t" in line else line.split(",")
+        if len(parts) >= 4 and parts[0].strip():
+            n_parsed += 1
+            if len(parsed_sample) < 20:
+                parsed_sample.append(parts[0].strip())
+
+        n_before = len(calls)
         if is_vcf:
             _parse_vcf_line(line, id_to_idx, calls)
         else:
-            _parse_23andme_line(line, id_to_idx, calls)
+            _parse_raw_text_line(line, id_to_idx, calls)
+
         if len(calls) >= len(id_to_idx):
             break  # every reference SNP has been found, no need to keep reading
-    return calls
+
+    diagnostics = {
+        "n_parsed": n_parsed,
+        "n_reference": len(id_to_idx),
+        "n_matching": len(calls),
+        "match_percentage": round((len(calls) / n_parsed * 100) if n_parsed else 0.0, 2),
+        "sample_parsed_rsids": parsed_sample,
+        "sample_matching_rsids": list(calls.keys())[:20],
+    }
+    return calls, diagnostics
+
+
+def _log_overlap_diagnostics(diagnostics: dict) -> None:
+    """Debug output requested when overlap is suspiciously low. Printed
+    to stdout, which lands in Vercel's function logs (Project -> Logs in
+    the Vercel dashboard, or `vercel logs` from the CLI)."""
+    print(f"Parsed SNPs: {diagnostics['n_parsed']}")
+    print(f"Reference SNPs: {diagnostics['n_reference']}")
+    print(f"Matching SNPs: {diagnostics['n_matching']}")
+    print(f"Match percentage: {diagnostics['match_percentage']}%")
+    print(f"First 20 parsed rsIDs: {diagnostics['sample_parsed_rsids']}")
+    print(f"First 20 matching rsIDs: {diagnostics['sample_matching_rsids']}")
 
 
 def build_feature_vector(calls: dict, model: dict):
@@ -482,8 +563,9 @@ def build_response(
 def handle_request(body: bytes) -> dict:
     model = load_model()
 
-    calls = parse_upload(body, model)
+    calls, diagnostics = parse_upload(body, model)
     if len(calls) < MIN_SNPS_REQUIRED:
+        _log_overlap_diagnostics(diagnostics)
         return {
             "error": (
                 f"Only {len(calls)} overlapping SNPs found in the uploaded file "
@@ -493,6 +575,7 @@ def handle_request(body: bytes) -> dict:
                 "the reference panel (this model expects hg19)."
             ),
             "error_type": "insufficient_overlap",
+            "diagnostics": diagnostics,
         }
 
     dosage, observed_mask, n_matched, n_dropped = build_feature_vector(calls, model)
