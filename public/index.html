@@ -217,6 +217,8 @@
   }
   .bar-fill {
     height: 100%;
+    width: 0%;
+    transition: width 1s cubic-bezier(.22,1,.36,1);
   }
 
   /* --- closest populations list --- */
@@ -385,6 +387,99 @@
     transform: rotate(-1deg) translate(1px, 1px);
     box-shadow: 2px 2px 0 rgba(23,23,18,0.9);
   }
+
+  .back-link {
+    display: inline-block;
+    font-family: var(--hand-body);
+    font-size: 15px;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 2px dashed var(--ink);
+  }
+  .back-link:hover { background: rgba(23,23,18,0.05); }
+
+  /* ---------------- motion / entrance animations ---------------- */
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes popIn {
+    0%   { opacity: 0; transform: scale(0.7) rotate(-3deg); }
+    65%  { transform: scale(1.08) rotate(1deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  @keyframes drawUnderline { to { stroke-dashoffset: 0; } }
+  @keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.15; }
+    40% { opacity: 1; }
+  }
+
+  .subsection {
+    opacity: 0;
+    animation: fadeSlideUp 0.55s cubic-bezier(.22,1,.36,1) forwards;
+  }
+  .results.show .subsection:nth-of-type(1) { animation-delay: 0.02s; }
+  .results.show .subsection:nth-of-type(2) { animation-delay: 0.10s; }
+  .results.show .subsection:nth-of-type(3) { animation-delay: 0.18s; }
+  .results.show .subsection:nth-of-type(4) { animation-delay: 0.26s; }
+  .results.show .subsection:nth-of-type(5) { animation-delay: 0.34s; }
+  .results.show .subsection:nth-of-type(6) { animation-delay: 0.42s; }
+
+  .bar-row, .pop-row {
+    opacity: 0;
+    animation: fadeSlideUp 0.5s cubic-bezier(.22,1,.36,1) forwards;
+  }
+
+  .confidence-badge {
+    display: inline-block;
+    animation: popIn 0.6s cubic-bezier(.34,1.56,.64,1) both;
+  }
+
+  .title-underline {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    height: 14px;
+    margin-top: -6px;
+    overflow: visible;
+  }
+  .title-underline path {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 420;
+    stroke-dashoffset: 420;
+    animation: drawUnderline 0.9s ease-out 0.35s forwards;
+  }
+
+  .loading-dots span {
+    display: inline-block;
+    animation: dotPulse 1.2s ease-in-out infinite;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+  .scatter-wrap { position: relative; }
+  .scatter-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: #fff;
+    border: 2px solid var(--ink);
+    border-radius: 8px 12px 8px 12px / 12px 8px 12px 8px;
+    padding: 6px 10px;
+    font-family: var(--hand-body);
+    font-size: 13px;
+    color: var(--ink);
+    box-shadow: 3px 3px 0 rgba(23,23,18,0.9);
+    opacity: 0;
+    transform: translate(-50%, -120%);
+    transition: opacity 0.12s ease;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .scatter-tooltip.show { opacity: 1; }
+  .scatter-tooltip .tt-code { font-family: var(--hand-display); font-size: 14px; }
 </style>
 <style id="theme-tactical-style" disabled>
   :root {
@@ -629,6 +724,8 @@
   }
   .bar-fill {
     height: 100%;
+    width: 0%;
+    transition: width 1s cubic-bezier(.22,1,.36,1);
     background: repeating-linear-gradient(
       45deg, var(--paper) 0 6px, #c9c8c1 6px 12px
     );
@@ -808,6 +905,100 @@
     background: var(--paper);
     color: var(--ink);
   }
+
+  .back-link {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid var(--paper);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .back-link:hover { background: rgba(255,255,255,0.06); }
+
+  /* ---------------- motion / entrance animations ---------------- */
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes popIn {
+    0%   { opacity: 0; transform: scale(0.7); }
+    65%  { transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes drawUnderline { to { stroke-dashoffset: 0; } }
+  @keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.15; }
+    40% { opacity: 1; }
+  }
+
+  .subsection {
+    opacity: 0;
+    animation: fadeSlideUp 0.55s cubic-bezier(.22,1,.36,1) forwards;
+  }
+  .results.show .subsection:nth-of-type(1) { animation-delay: 0.02s; }
+  .results.show .subsection:nth-of-type(2) { animation-delay: 0.10s; }
+  .results.show .subsection:nth-of-type(3) { animation-delay: 0.18s; }
+  .results.show .subsection:nth-of-type(4) { animation-delay: 0.26s; }
+  .results.show .subsection:nth-of-type(5) { animation-delay: 0.34s; }
+  .results.show .subsection:nth-of-type(6) { animation-delay: 0.42s; }
+
+  .bar-row, .pop-row {
+    opacity: 0;
+    animation: fadeSlideUp 0.5s cubic-bezier(.22,1,.36,1) forwards;
+  }
+
+  .confidence-badge {
+    display: inline-block;
+    animation: popIn 0.6s cubic-bezier(.34,1.56,.64,1) both;
+  }
+
+  .title-underline {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    height: 10px;
+    margin-top: -4px;
+    overflow: visible;
+  }
+  .title-underline path {
+    fill: none;
+    stroke: var(--paper);
+    stroke-width: 2;
+    stroke-dasharray: 420;
+    stroke-dashoffset: 420;
+    animation: drawUnderline 0.9s ease-out 0.35s forwards;
+  }
+
+  .loading-dots span {
+    display: inline-block;
+    animation: dotPulse 1.2s ease-in-out infinite;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+  .scatter-wrap { position: relative; }
+  .scatter-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--ink-soft);
+    border: 1px solid var(--paper);
+    padding: 6px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--paper);
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translate(-50%, -120%);
+    transition: opacity 0.12s ease;
+    white-space: nowrap;
+    z-index: 10;
+    clip-path: polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  }
+  .scatter-tooltip.show { opacity: 1; }
+  .scatter-tooltip .tt-code { font-family: var(--stencil); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -816,6 +1007,9 @@
   <header>
     <div class="eyebrow">SNP &middot; PCA &middot; 1000 Genomes Reference Panel</div>
     <h1>Genetic ancestry estimator</h1>
+    <svg class="title-underline" viewBox="0 0 340 14" preserveAspectRatio="none">
+      <path d="M3,7 C60,2 120,11 180,6 C230,2 280,10 337,5" />
+    </svg>
     <p class="lede">
       Upload a raw SNP export (23andMe/AncestryDNA text, or a single-sample VCF).
       It's projected into a PCA space built from the public 1000 Genomes reference
@@ -868,7 +1062,10 @@
 
       <div class="subsection">
         <h2 class="section-title">PCA Projection</h2>
-        <canvas id="scatter" width="800" height="360"></canvas>
+        <div class="scatter-wrap">
+          <canvas id="scatter" width="800" height="360"></canvas>
+          <div class="scatter-tooltip" id="scatter-tooltip"><span class="tt-code"></span><br><span class="tt-detail"></span></div>
+        </div>
         <div class="scatter-legend" id="scatter-legend"></div>
       </div>
 
@@ -901,6 +1098,8 @@
     Test data: your uploaded genome, never used to build the reference model.
     Results describe genetic similarity to these reference populations, not self-identified
     ethnicity or exact genealogical ancestry.
+    <br /><br />
+    <a href="validation.html" class="back-link">See leave-one-out model validation &rarr;</a>
   </footer>
 
 <script>
@@ -950,6 +1149,27 @@
     SAS: 'South Asian',
   };
 
+  // Approximate 1000 Genomes sampling-site coordinates [lat, lon] for each
+  // reference population. Several of these are diaspora/immigrant cohorts
+  // sampled in the Americas or UK rather than an ancestral homeland (ASW,
+  // ACB, MXL, PUR, CLM, PEL, CEU, GIH, STU, ITU) -- the map below is
+  // explicit about that, since conflating "where the reference sample was
+  // collected" with "ancestral origin" would misrepresent what these
+  // populations actually are.
+  const POP_GEO = {
+    YRI: [7.4, 3.9],     LWK: [0.6, 34.8],    GWD: [13.5, -15.3],
+    MSL: [8.5, -11.8],   ESN: [6.9, 6.0],     ASW: [33.4, -111.9],
+    ACB: [13.1, -59.6],
+    MXL: [34.05, -118.24], PUR: [18.2, -66.5], CLM: [6.25, -75.56],
+    PEL: [-12.05, -77.04],
+    CHB: [39.9, 116.4],  JPT: [35.68, 139.77], CHS: [23.1, 113.3],
+    CDX: [22.0, 100.8],  KHV: [10.8, 106.6],
+    CEU: [40.76, -111.89], TSI: [43.77, 11.25], FIN: [60.17, 24.94],
+    GBR: [54.0, -2.0],   IBS: [40.4, -3.7],
+    GIH: [29.76, -95.37], PJL: [31.55, 74.34], BEB: [23.68, 90.36],
+    STU: [51.0, 0.5],    ITU: [52.0, -1.5],
+  };
+
   const SUPER_COLORS = {
     AFR: '#E69F00',
     AMR: '#56B4E9',
@@ -987,6 +1207,8 @@
   const scatterLegendEl = document.getElementById('scatter-legend');
   const canvas = document.getElementById('scatter');
   const ctx = canvas.getContext('2d');
+  const scatterTooltip = document.getElementById('scatter-tooltip');
+  let scatterHitPoints = []; // populated by drawScatter, read by the hover handler
 
   let selectedFile = null;
   let referenceSnps = null;
@@ -1089,11 +1311,15 @@
     });
   });
 
+  function setLoadingStatus(text) {
+    statusEl.innerHTML = `${text}<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>`;
+  }
+
   runBtn.addEventListener('click', async () => {
     if (!selectedFile) return;
     runBtn.disabled = true;
     statusEl.classList.remove('error', 'warn');
-    statusEl.textContent = 'Filtering SNPs and uploading\u2026';
+    setLoadingStatus('Filtering SNPs and uploading');
     resultsEl.classList.remove('show');
 
     try {
@@ -1113,7 +1339,7 @@
         runBtn.disabled = false;
         return;
       }
-      statusEl.textContent = `Uploading ${kept.toLocaleString()} SNPs\u2026`;
+      setLoadingStatus(`Uploading ${kept.toLocaleString()} SNPs`);
 
       let resp, data;
       try {
@@ -1159,18 +1385,42 @@
     resultsEl.classList.add('show');
   }
 
+  /** Animate a number counting up from 0 to `target` (as a percentage
+   * string), eased, over `duration` ms. */
+  function animateCountUp(el, target, duration = 900, delay = 0) {
+    const start = performance.now() + delay;
+    function tick(now) {
+      const elapsed = now - start;
+      if (elapsed < 0) { requestAnimationFrame(tick); return; }
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out-cubic
+      el.textContent = (target * eased).toFixed(1) + '%';
+      if (t < 1) requestAnimationFrame(tick);
+      else el.textContent = target.toFixed(1) + '%';
+    }
+    requestAnimationFrame(tick);
+  }
+
   function renderContinentalBars(proportions) {
     barsEl.innerHTML = '';
     const entries = Object.entries(proportions).sort((a, b) => b[1] - a[1]);
-    entries.forEach(([code, frac]) => {
+    entries.forEach(([code, frac], i) => {
+      const pct = frac * 100;
       const row = document.createElement('div');
       row.className = 'bar-row';
+      row.style.animationDelay = `${0.08 + i * 0.07}s`;
       row.innerHTML = `
         <div>${superName(code)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(frac * 100).toFixed(1)}%; background:linear-gradient(90deg, ${SUPER_COLORS[code]}88, ${SUPER_COLORS[code]})"></div></div>
-        <div>${(frac * 100).toFixed(1)}%</div>
+        <div class="bar-track"><div class="bar-fill" style="background:linear-gradient(90deg, ${SUPER_COLORS[code]}88, ${SUPER_COLORS[code]})"></div></div>
+        <div class="bar-pct">0.0%</div>
       `;
       barsEl.appendChild(row);
+      const fillEl = row.querySelector('.bar-fill');
+      const pctEl = row.querySelector('.bar-pct');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { fillEl.style.width = pct.toFixed(1) + '%'; });
+      });
+      animateCountUp(pctEl, pct, 900, 150 + i * 70);
     });
   }
 
@@ -1179,10 +1429,11 @@
     const entries = Object.entries(closestPopulations)
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit);
-    entries.forEach(([code, frac]) => {
+    entries.forEach(([code, frac], i) => {
       const info = POP_INFO[code];
       const row = document.createElement('div');
       row.className = 'pop-row';
+      row.style.animationDelay = `${0.05 + i * 0.06}s`;
       row.innerHTML = `
         <div><span class="pop-name">${popName(code)}</span><span class="pop-code">${code}</span></div>
         <div class="pop-super">${info ? superName(info.super) : ''}</div>
@@ -1276,6 +1527,7 @@
 
   function drawScatter(userCoords, closestPopulations) {
     const pal = THEME_PALETTES[currentTheme()];
+    scatterHitPoints = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1338,6 +1590,7 @@
       ctx.beginPath();
       ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
       ctx.fill();
+      scatterHitPoints.push({ x: cx, y: cy, r: 4, type: 'ref', title: superName(pop) || pop, detail: '1000 Genomes reference sample' });
     });
     ctx.globalAlpha = 1;
 
@@ -1382,6 +1635,12 @@
       ctx.fillStyle = pal.ink;
       ctx.font = rank === 0 ? pal.fontBold : pal.font;
       ctx.fillText(code, cx + 10, cy - 6);
+
+      scatterHitPoints.push({
+        x: cx, y: cy, r: (rank === 0 ? 9 : 6) + 3, type: 'centroid',
+        title: `${popName(code)} (${code})`,
+        detail: `${info ? superName(info.super) : ''} \u00b7 rank #${rank + 1} closest match`,
+      });
     });
 
     // user point, drawn last so it's on top
@@ -1397,8 +1656,48 @@
       ctx.fillStyle = pal.ink;
       ctx.font = pal.fontBold;
       ctx.fillText('you', userCanvasXY[0] + 10, userCanvasXY[1] + 4);
+
+      scatterHitPoints.push({
+        x: userCanvasXY[0], y: userCanvasXY[1], r: 10, type: 'you',
+        title: 'You', detail: 'Your projected genotype position',
+      });
     }
   }
+
+  // ---------------------------------------------------------------------
+  // Scatter hover tooltips -- nearest hit-testable point under the
+  // cursor, scanned linearly (a few hundred points max, well within a
+  // single mousemove's budget).
+  // ---------------------------------------------------------------------
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    let best = null;
+    let bestDist = Infinity;
+    for (const p of scatterHitPoints) {
+      const d = Math.hypot(p.x - mx, p.y - my);
+      if (d <= p.r && d < bestDist) { best = p; bestDist = d; }
+    }
+
+    if (best) {
+      scatterTooltip.querySelector('.tt-code').textContent = best.title;
+      scatterTooltip.querySelector('.tt-detail').textContent = best.detail;
+      scatterTooltip.style.left = `${(best.x / canvas.width) * 100}%`;
+      scatterTooltip.style.top = `${(best.y / canvas.height) * 100}%`;
+      scatterTooltip.classList.add('show');
+      canvas.style.cursor = 'pointer';
+    } else {
+      scatterTooltip.classList.remove('show');
+      canvas.style.cursor = 'default';
+    }
+  });
+  canvas.addEventListener('mouseleave', () => {
+    scatterTooltip.classList.remove('show');
+  });
 
   // ---------------------------------------------------------------------
   // Theme toggle -- swaps between the "sketch" (hand-drawn) and "tactical"
