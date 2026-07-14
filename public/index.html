@@ -135,6 +135,32 @@
     margin-top: 10px;
   }
 
+  .examples {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+  }
+  .examples-label {
+    font-family: var(--hand-body);
+    font-size: 14px;
+    color: var(--dim);
+    margin-right: 2px;
+  }
+  .example-btn {
+    background: #fff;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    border-radius: 12px 8px 12px 8px / 8px 12px 8px 12px;
+    padding: 6px 12px;
+    font-family: var(--hand-body);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .example-btn:hover { background: var(--ink); color: var(--paper); }
+
   button.run {
     margin-top: 20px;
     width: 100%;
@@ -516,6 +542,37 @@
     margin-top: 12px;
   }
 
+  .examples {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+  }
+  .examples-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--dim);
+    margin-right: 2px;
+  }
+  .example-btn {
+    background: transparent;
+    color: var(--paper);
+    border: 1px solid var(--line-bright);
+    border-radius: 0;
+    padding: 6px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    clip-path: polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .example-btn:hover { background: var(--paper); color: var(--ink); }
+
   button.run {
     margin-top: 20px;
     width: 100%;
@@ -774,6 +831,12 @@
         <div class="filename" id="filename"></div>
         <input type="file" id="file-input" accept=".txt,.csv,.vcf" />
       </div>
+      <div class="examples" id="examples">
+        <span class="examples-label">Or try a labeled example:</span>
+        <button type="button" class="example-btn" data-example="HG00096_23andme.txt" data-label="British (GBR)">British (GBR)</button>
+        <button type="button" class="example-btn" data-example="NA19238_23andme.txt" data-label="Yoruba (YRI)">Yoruba (YRI)</button>
+        <button type="button" class="example-btn" data-example="NA19648_23andme.txt" data-label="Mexican, admixed (MXL)">Mexican, admixed (MXL)</button>
+      </div>
       <button class="run" id="run-btn" disabled>Estimate ancestry</button>
       <div class="status" id="status"></div>
     </div>
@@ -1002,6 +1065,29 @@
     statusEl.textContent = '';
     statusEl.classList.remove('error', 'warn');
   }
+
+  // Preloaded, labeled 1000 Genomes examples for demo purposes -- each has
+  // a known population/super-population label, so results here double as
+  // a quick sanity check that the pipeline is behaving as expected.
+  document.querySelectorAll('.example-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const path = btn.dataset.example;
+      const label = btn.dataset.label;
+      statusEl.classList.remove('error', 'warn');
+      statusEl.textContent = `Loading example (${label})\u2026`;
+      try {
+        const resp = await fetch(`examples/${path}`);
+        if (!resp.ok) throw new Error('fetch failed');
+        const text = await resp.text();
+        const file = new File([text], path, { type: 'text/plain' });
+        setFile(file);
+        statusEl.textContent = `Loaded example: ${label}. Click "Estimate ancestry" to run it.`;
+      } catch (err) {
+        statusEl.textContent = 'Could not load that example file.';
+        statusEl.classList.add('error');
+      }
+    });
+  });
 
   runBtn.addEventListener('click', async () => {
     if (!selectedFile) return;
