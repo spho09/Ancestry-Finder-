@@ -1828,7 +1828,7 @@
   // Drag (mouse or touch) to rotate; it also auto-rotates gently when idle.
   // =======================================================================
   let viewMode = '3d';
-  let rotY = 0.6, rotX = -0.35, zoom3D = 1;
+  let rotY = 0.6, rotX = -0.42, zoom3D = 1;
   let isDragging3D = false;
   let autoRotate3D = true;
   let dragStart3D = null;
@@ -1911,9 +1911,9 @@
     const z1 = x * sinY + z * cosY;
     const y1 = y * cosX - z1 * sinX;
     const z2 = y * sinX + z1 * cosX;
-    const focal = 3.4;
+    const focal = 2.5;
     const persp = (focal / (focal + z2)) * zoom3D;
-    return { sx: cx + x1 * scale * persp, sy: cy - y1 * scale * persp, persp };
+    return { sx: cx + x1 * scale * persp, sy: cy - y1 * scale * persp, persp, z2 };
   }
 
   function buildStarField(n) {
@@ -1953,9 +1953,56 @@
 
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 + 8;
-    const scale = Math.min(canvas.width, canvas.height) * 0.38;
+    const scale = Math.min(canvas.width, canvas.height) * 0.36;
+    const h = 1.3; // bounding-cube half-extent (data is normalized to roughly [-1,1])
+    const floorY = -h;
 
-    // faint 3D axis gizmo through the origin, so rotation reads as rotation
+    // -----------------------------------------------------------------
+    // Bounding cube + floor grid -- the single biggest fix for "looks
+    // flat": a wireframe box around the cloud reads as 3D space from any
+    // rotation angle, and the floor grid gives every point a ground
+    // plane to cast a shadow onto.
+    // -----------------------------------------------------------------
+    const corners = [
+      [-h, -h, -h], [h, -h, -h], [h, h, -h], [-h, h, -h],
+      [-h, -h, h], [h, -h, h], [h, h, h], [-h, h, h],
+    ].map(([x, y, z]) => rotateProject(x, y, z, cx, cy, scale));
+    const cubeEdges = [
+      [0, 1], [1, 2], [2, 3], [3, 0],
+      [4, 5], [5, 6], [6, 7], [7, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7],
+    ];
+    ctx.strokeStyle = pal.axis;
+    ctx.lineWidth = 1;
+    cubeEdges.forEach(([a, b]) => {
+      const pa = corners[a], pb = corners[b];
+      ctx.globalAlpha = 0.22;
+      ctx.beginPath();
+      ctx.moveTo(pa.sx, pa.sy);
+      ctx.lineTo(pb.sx, pb.sy);
+      ctx.stroke();
+    });
+
+    const gridN = 6;
+    ctx.globalAlpha = 0.16;
+    for (let i = 0; i <= gridN; i++) {
+      const t = -h + (2 * h * i) / gridN;
+      const p0 = rotateProject(t, floorY, -h, cx, cy, scale);
+      const p1 = rotateProject(t, floorY, h, cx, cy, scale);
+      ctx.beginPath();
+      ctx.moveTo(p0.sx, p0.sy);
+      ctx.lineTo(p1.sx, p1.sy);
+      ctx.stroke();
+      const q0 = rotateProject(-h, floorY, t, cx, cy, scale);
+      const q1 = rotateProject(h, floorY, t, cx, cy, scale);
+      ctx.beginPath();
+      ctx.moveTo(q0.sx, q0.sy);
+      ctx.lineTo(q1.sx, q1.sy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // faint axis gizmo through the origin, so rotation reads as rotation
     const axisLen = 1.15;
     const axes = [
       { from: [-axisLen, 0, 0], to: [axisLen, 0, 0], label: 'PC1' },
@@ -1986,6 +2033,40 @@
     if (scene3D.you) items.push({ ...scene3D.you, ...rotateProject(scene3D.you.x, scene3D.you.y, scene3D.you.z, cx, cy, scale) });
     items.sort((a, b) => a.persp - b.persp);
 
+    // normalize depth against this frame's actual near/far range (rather
+    // than a fixed guess) so size/opacity contrast stays strong at any
+    // zoom or rotation
+    const perspVals = items.map(it => it.persp);
+    const perspMin = Math.min(...perspVals);
+    const perspMax = Math.max(...perspVals);
+    const perspSpan = (perspMax - perspMin) || 1;
+    const depthOf = (p) => Math.pow(Math.max(0, Math.min(1, (p - perspMin) / perspSpan)), 0.85);
+
+    // ground shadows + vertical "stem" lines for the important points
+    // (you + top centroids) -- the classic depth cue that anchors a
+    // floating point to the floor plane so its height reads instantly
+    const keyPoints = [...scene3D.centroids, ...(scene3D.you ? [scene3D.you] : [])];
+    keyPoints.forEach(kp => {
+      const top = rotateProject(kp.x, kp.y, kp.z, cx, cy, scale);
+      const base = rotateProject(kp.x, floorY, kp.z, cx, cy, scale);
+      const d = depthOf(top.persp);
+      ctx.strokeStyle = pal.axis;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(top.sx, top.sy);
+      ctx.lineTo(base.sx, base.sy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = pal.ink;
+      ctx.globalAlpha = 0.18 + d * 0.14;
+      ctx.beginPath();
+      ctx.ellipse(base.sx, base.sy, (6 + d * 3) * base.persp, (2.2 + d * 1) * base.persp, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
     // dashed connector lines from "you" to its top centroids, drawn under the points
     if (scene3D.you) {
       const youP = items.find(i => i.kind === 'you');
@@ -2006,31 +2087,44 @@
     }
 
     items.forEach(it => {
-      const depthT = Math.max(0, Math.min(1, (it.persp - 0.55) / 0.9));
+      const depthT = depthOf(it.persp);
       if (it.kind === 'ref') {
-        const r = 1.1 + depthT * 2.4;
-        ctx.globalAlpha = 0.18 + depthT * 0.55;
+        const r = 0.85 + depthT * 3.1;
+        ctx.globalAlpha = 0.12 + depthT * 0.68;
         ctx.fillStyle = it.color || pal.refFallback;
         ctx.beginPath();
         ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
         ctx.fill();
+        // tiny highlight fleck on nearer points -- cheap fake-sphere shading
+        if (depthT > 0.55) {
+          ctx.globalAlpha = (depthT - 0.55) * 0.9;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(it.sx - r * 0.32, it.sy - r * 0.32, r * 0.34, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.globalAlpha = 1;
         scatterHitPoints.push({ x: it.sx, y: it.sy, r: r + 2.5, type: 'ref', title: it.title, detail: it.detail });
       } else if (it.kind === 'centroid') {
-        const r = (it.rank === 0 ? 8 : 5.5) * (0.6 + depthT * 0.6);
+        const r = (it.rank === 0 ? 8 : 5.5) * (0.55 + depthT * 0.7);
         ctx.strokeStyle = it.color || pal.ink;
         ctx.lineWidth = it.rank === 0 ? 2.5 : 1.5;
-        ctx.globalAlpha = 0.5 + depthT * 0.5;
+        ctx.globalAlpha = 0.45 + depthT * 0.55;
         ctx.beginPath();
         ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.fillStyle = it.color || pal.ink;
+        ctx.globalAlpha = (0.45 + depthT * 0.55) * 0.22;
+        ctx.beginPath();
+        ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
+        ctx.fill();
         ctx.globalAlpha = 1;
         ctx.fillStyle = pal.ink;
         ctx.font = it.rank === 0 ? pal.fontBold : pal.font;
         ctx.fillText(it.code, it.sx + r + 3, it.sy - 4);
         scatterHitPoints.push({ x: it.sx, y: it.sy, r: r + 4, type: 'centroid', title: it.title, detail: it.detail });
       } else if (it.kind === 'you') {
-        const r = 6 * (0.7 + depthT * 0.5);
+        const r = 6 * (0.65 + depthT * 0.6);
         const glow = ctx.createRadialGradient(it.sx, it.sy, 0, it.sx, it.sy, r * 3.4);
         glow.addColorStop(0, pal.youGlow);
         glow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -2039,7 +2133,13 @@
         ctx.arc(it.sx, it.sy, r * 3.4, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = pal.youFill;
+        const sphere = ctx.createRadialGradient(
+          it.sx - r * 0.35, it.sy - r * 0.35, r * 0.1,
+          it.sx, it.sy, r * 1.1
+        );
+        sphere.addColorStop(0, '#ffffff');
+        sphere.addColorStop(1, pal.youFill);
+        ctx.fillStyle = sphere;
         ctx.beginPath();
         ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
         ctx.fill();
