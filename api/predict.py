@@ -598,7 +598,7 @@ def build_response(
         "closest_populations": {k: round(v, 4) for k, v in sorted_pops},
         "confidence": confidence,
         "mean_neighbor_distance": round(mean_neighbor_distance, 3),
-        "pca_coordinates": user_pcs[:2].tolist(),
+        "pca_coordinates": user_pcs[:3].tolist(),
         "population_distances": {k: round(pca_distances[k], 3) for k in candidate_codes},
         "n_snps_used": int(n_matched),
         "n_snps_total_in_reference": int(n_total),

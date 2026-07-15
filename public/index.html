@@ -480,6 +480,53 @@
   }
   .scatter-tooltip.show { opacity: 1; }
   .scatter-tooltip .tt-code { font-family: var(--hand-display); font-size: 14px; }
+
+  .scatter-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 2px dashed var(--line-soft);
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+  }
+  .scatter-title { border-bottom: none; padding-bottom: 0; margin: 0; }
+  .scatter-mode-toggle {
+    display: inline-flex;
+    gap: 2px;
+    background: var(--paper-panel);
+    border: 2px solid var(--ink);
+    border-radius: 10px 14px 10px 14px / 14px 10px 14px 10px;
+    padding: 3px;
+  }
+  .mode-btn {
+    font-family: var(--hand-body);
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: transparent;
+    border: none;
+    border-radius: 7px 10px 7px 10px / 10px 7px 10px 7px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .mode-btn.active { background: var(--hi); color: var(--ink); }
+  .mode-btn:hover:not(.active) { color: var(--ink); }
+  .scatter-hint {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    font-family: var(--hand-mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: rgba(255,255,255,0.75);
+    padding: 3px 9px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0.85;
+    transition: opacity 0.4s ease;
+  }
+  .scatter-hint.fade { opacity: 0; }
 </style>
 <style id="theme-tactical-style" disabled>
   :root {
@@ -999,6 +1046,53 @@
   }
   .scatter-tooltip.show { opacity: 1; }
   .scatter-tooltip .tt-code { font-family: var(--stencil); font-size: 13px; }
+
+  .scatter-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+  .scatter-title { border-bottom: none; padding-bottom: 0; margin: 0; }
+  .scatter-mode-toggle {
+    display: inline-flex;
+    gap: 2px;
+    background: var(--ink-soft);
+    border: 1px solid var(--line-bright);
+  }
+  .mode-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    padding: 6px 13px;
+    cursor: pointer;
+  }
+  .mode-btn.active { background: var(--paper); color: var(--ink); }
+  .mode-btn:hover:not(.active) { color: var(--paper); }
+  .scatter-hint {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    background: rgba(0,0,0,0.55);
+    padding: 3px 9px;
+    pointer-events: none;
+    opacity: 0.85;
+    transition: opacity 0.4s ease;
+  }
+  .scatter-hint.fade { opacity: 0; }
 </style>
 </head>
 <body>
@@ -1061,9 +1155,16 @@
       </div>
 
       <div class="subsection">
-        <h2 class="section-title">PCA Projection</h2>
+        <div class="scatter-head">
+          <h2 class="section-title scatter-title">PCA Projection</h2>
+          <div class="scatter-mode-toggle" id="scatter-mode-toggle" role="group" aria-label="Projection view mode">
+            <button type="button" class="mode-btn" data-mode="2d" id="mode-2d-btn">2D</button>
+            <button type="button" class="mode-btn active" data-mode="3d" id="mode-3d-btn">3D</button>
+          </div>
+        </div>
         <div class="scatter-wrap">
-          <canvas id="scatter" width="800" height="360"></canvas>
+          <canvas id="scatter" width="800" height="440"></canvas>
+          <div class="scatter-hint" id="scatter-hint">drag to rotate &middot; scroll to zoom</div>
           <div class="scatter-tooltip" id="scatter-tooltip"><span class="tt-code"></span><br><span class="tt-detail"></span></div>
         </div>
         <div class="scatter-legend" id="scatter-legend"></div>
@@ -1230,7 +1331,7 @@
   }
   loadReferenceAssets();
 
-  /** Lightweight client-side centroid computation (PC1/PC2 only, purely
+  /** Lightweight client-side centroid computation (PC1/PC2/PC3, purely
    * for visualization -- the real, full-dimensional centroids used for
    * actual inference are precomputed offline and live in the backend
    * model, not here). Just a groupBy + average over ~2,500 points. */
@@ -1238,16 +1339,15 @@
     if (!scatter || !scatter.points || !scatter.pop_labels) return {};
     const sums = {};
     const counts = {};
-    scatter.points.forEach(([x, y], i) => {
+    scatter.points.forEach((pt, i) => {
       const pop = scatter.pop_labels[i];
-      if (!sums[pop]) { sums[pop] = [0, 0]; counts[pop] = 0; }
-      sums[pop][0] += x;
-      sums[pop][1] += y;
+      if (!sums[pop]) { sums[pop] = [0, 0, 0]; counts[pop] = 0; }
+      for (let d = 0; d < pt.length; d++) sums[pop][d] += pt[d];
       counts[pop] += 1;
     });
     const centroids = {};
     Object.keys(sums).forEach(pop => {
-      centroids[pop] = [sums[pop][0] / counts[pop], sums[pop][1] / counts[pop]];
+      centroids[pop] = sums[pop].map(s => s / counts[pop]);
     });
     return centroids;
   }
@@ -1380,7 +1480,7 @@
     renderInterpretation(data);
     renderMeta(data);
     noteEl.textContent = data.note;
-    drawScatter(data.pca_coordinates, data.closest_populations);
+    renderScatterView(data);
     renderScatterLegend();
     resultsEl.classList.add('show');
   }
@@ -1497,6 +1597,7 @@
   const THEME_PALETTES = {
     sketch: {
       bg: '#ffffff',
+      bgGrad: ['#fffdf8', '#f2ede1'],
       axis: '#b9b6a6',
       axisText: '#78766a',
       font: '13px "Patrick Hand", monospace',
@@ -1506,9 +1607,12 @@
       youFill: '#ffffff',
       youStroke: '#171712',
       youLineWidth: 2.5,
+      youGlow: 'rgba(230,159,0,0.5)',
+      starColor: null,
     },
     tactical: {
       bg: '#050505',
+      bgGrad: ['#0a0d0a', '#000000'],
       axis: '#3d3d3d',
       axisText: '#7c7a70',
       font: '11px "Share Tech Mono", monospace',
@@ -1518,6 +1622,8 @@
       youFill: '#f2f1ec',
       youStroke: '#0a0a0a',
       youLineWidth: 2,
+      youGlow: 'rgba(120,220,180,0.55)',
+      starColor: 'rgba(255,255,255,0.5)',
     },
   };
 
@@ -1529,7 +1635,10 @@
     const pal = THEME_PALETTES[currentTheme()];
     scatterHitPoints = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = pal.bg;
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGrad.addColorStop(0, pal.bgGrad[0]);
+    bgGrad.addColorStop(1, pal.bgGrad[1]);
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const pad = 36;
@@ -1541,7 +1650,7 @@
     const refPoints = referenceScatter?.points || [];
     const refLabels = referenceScatter?.labels || [];
     refPoints.forEach(([x, y]) => { allX.push(x); allY.push(y); });
-    if (userCoords?.length === 2) {
+    if (userCoords?.length >= 2) {
       allX.push(userCoords[0]);
       allY.push(userCoords[1]);
     }
@@ -1600,7 +1709,7 @@
       .slice(0, 3)
       .map(([code]) => code);
 
-    const userCanvasXY = userCoords?.length === 2 ? toCanvas(userCoords) : null;
+    const userCanvasXY = userCoords?.length >= 2 ? toCanvas(userCoords) : null;
 
     topPops.forEach((code, rank) => {
       const centroid = popCentroids && popCentroids[code];
@@ -1645,6 +1754,17 @@
 
     // user point, drawn last so it's on top
     if (userCanvasXY) {
+      const glow = ctx.createRadialGradient(
+        userCanvasXY[0], userCanvasXY[1], 0,
+        userCanvasXY[0], userCanvasXY[1], 22
+      );
+      glow.addColorStop(0, pal.youGlow || 'rgba(230,159,0,0.45)');
+      glow.addColorStop(1, 'rgba(230,159,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(userCanvasXY[0], userCanvasXY[1], 22, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.fillStyle = pal.youFill;
       ctx.beginPath();
       ctx.arc(userCanvasXY[0], userCanvasXY[1], 7, 0, Math.PI * 2);
@@ -1683,21 +1803,352 @@
       if (d <= p.r && d < bestDist) { best = p; bestDist = d; }
     }
 
-    if (best) {
+    if (best && !isDragging3D) {
       scatterTooltip.querySelector('.tt-code').textContent = best.title;
       scatterTooltip.querySelector('.tt-detail').textContent = best.detail;
       scatterTooltip.style.left = `${(best.x / canvas.width) * 100}%`;
       scatterTooltip.style.top = `${(best.y / canvas.height) * 100}%`;
       scatterTooltip.classList.add('show');
-      canvas.style.cursor = 'pointer';
+      if (viewMode !== '3d') canvas.style.cursor = 'pointer';
     } else {
       scatterTooltip.classList.remove('show');
-      canvas.style.cursor = 'default';
+      if (viewMode !== '3d') canvas.style.cursor = 'default';
     }
   });
   canvas.addEventListener('mouseleave', () => {
     scatterTooltip.classList.remove('show');
   });
+
+  // =======================================================================
+  // 3D PCA view -- a hand-rolled perspective point cloud rendered on the
+  // same 2D canvas (no extra libraries). Reference samples, the top
+  // population centroids, and the user's own point are projected each
+  // frame with a simple yaw/pitch rotation + perspective divide, then
+  // painter's-algorithm sorted so nearer points draw on top and larger.
+  // Drag (mouse or touch) to rotate; it also auto-rotates gently when idle.
+  // =======================================================================
+  let viewMode = '3d';
+  let rotY = 0.6, rotX = -0.35, zoom3D = 1;
+  let isDragging3D = false;
+  let autoRotate3D = true;
+  let dragStart3D = null;
+  let autoRotateResumeTimer = null;
+  let raf3D = null;
+  let scene3D = null; // built once per result/mode-switch, reused every frame
+  let starField = null;
+
+  const mode2dBtn = document.getElementById('mode-2d-btn');
+  const mode3dBtn = document.getElementById('mode-3d-btn');
+  const scatterHintEl = document.getElementById('scatter-hint');
+
+  /** Center + scale reference cloud, centroids, and the user point into a
+   * roughly [-1, 1] cube so the rotation pivots around the data's own
+   * middle rather than an arbitrary corner. Runs once per new result
+   * (or whenever the mode is switched to 3D), not every animation frame. */
+  function buildScene3D(userCoords, closestPopulations) {
+    const refPoints = referenceScatter?.points || [];
+    const refLabels = referenceScatter?.labels || [];
+    if (!refPoints.length) { scene3D = null; return; }
+
+    const mins = [Infinity, Infinity, Infinity];
+    const maxs = [-Infinity, -Infinity, -Infinity];
+    const consider = (pt) => {
+      for (let d = 0; d < 3; d++) {
+        const v = pt[d] || 0;
+        if (v < mins[d]) mins[d] = v;
+        if (v > maxs[d]) maxs[d] = v;
+      }
+    };
+    refPoints.forEach(consider);
+    if (userCoords?.length >= 3) consider(userCoords);
+
+    const center = [0, 1, 2].map(d => (mins[d] + maxs[d]) / 2);
+    const extent = Math.max(...[0, 1, 2].map(d => (maxs[d] - mins[d]) || 1)) / 2;
+    const norm = (pt) => [0, 1, 2].map(d => ((pt[d] || 0) - center[d]) / extent);
+
+    const refs = refPoints.map((pt, i) => {
+      const [x, y, z] = norm(pt);
+      const pop = refLabels[i];
+      return {
+        x, y, z, kind: 'ref',
+        color: SUPER_COLORS[pop] || null,
+        title: superName(pop) || pop,
+        detail: '1000 Genomes reference sample',
+      };
+    });
+
+    const topPops = Object.entries(closestPopulations || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([code]) => code);
+
+    const centroids = topPops.map((code, rank) => {
+      const raw = popCentroids && popCentroids[code];
+      if (!raw) return null;
+      const [x, y, z] = norm(raw);
+      const info = POP_INFO[code];
+      return {
+        x, y, z, kind: 'centroid', code, rank,
+        color: info ? SUPER_COLORS[info.super] : null,
+        title: `${popName(code)} (${code})`,
+        detail: `${info ? superName(info.super) : ''} \u00b7 rank #${rank + 1} closest match`,
+      };
+    }).filter(Boolean);
+
+    let you = null;
+    if (userCoords?.length >= 3) {
+      const [x, y, z] = norm(userCoords);
+      you = { x, y, z, kind: 'you', title: 'You', detail: 'Your projected genotype position' };
+    }
+
+    scene3D = { refs, centroids, you };
+  }
+
+  function rotateProject(x, y, z, cx, cy, scale) {
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+    const x1 = x * cosY - z * sinY;
+    const z1 = x * sinY + z * cosY;
+    const y1 = y * cosX - z1 * sinX;
+    const z2 = y * sinX + z1 * cosX;
+    const focal = 3.4;
+    const persp = (focal / (focal + z2)) * zoom3D;
+    return { sx: cx + x1 * scale * persp, sy: cy - y1 * scale * persp, persp };
+  }
+
+  function buildStarField(n) {
+    const stars = [];
+    for (let i = 0; i < n; i++) {
+      stars.push({ x: Math.random() * 800, y: Math.random() * 440, r: Math.random() * 1.2 + 0.2, a: Math.random() * 0.6 + 0.15 });
+    }
+    return stars;
+  }
+
+  function renderScene3D() {
+    const pal = THEME_PALETTES[currentTheme()];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const bgGrad = ctx.createRadialGradient(
+      canvas.width / 2, canvas.height * 0.42, 10,
+      canvas.width / 2, canvas.height * 0.42, canvas.width * 0.7
+    );
+    bgGrad.addColorStop(0, pal.bgGrad[0]);
+    bgGrad.addColorStop(1, pal.bgGrad[1]);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (pal.starColor) {
+      if (!starField) starField = buildStarField(90);
+      starField.forEach(s => {
+        ctx.globalAlpha = s.a;
+        ctx.fillStyle = pal.starColor;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    if (!scene3D) return;
+    scatterHitPoints = [];
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2 + 8;
+    const scale = Math.min(canvas.width, canvas.height) * 0.38;
+
+    // faint 3D axis gizmo through the origin, so rotation reads as rotation
+    const axisLen = 1.15;
+    const axes = [
+      { from: [-axisLen, 0, 0], to: [axisLen, 0, 0], label: 'PC1' },
+      { from: [0, -axisLen, 0], to: [0, axisLen, 0], label: 'PC2' },
+      { from: [0, 0, -axisLen], to: [0, 0, axisLen], label: 'PC3' },
+    ];
+    ctx.strokeStyle = pal.axis;
+    ctx.lineWidth = 1;
+    ctx.font = pal.font;
+    axes.forEach(a => {
+      const p0 = rotateProject(a.from[0], a.from[1], a.from[2], cx, cy, scale);
+      const p1 = rotateProject(a.to[0], a.to[1], a.to[2], cx, cy, scale);
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(p0.sx, p0.sy);
+      ctx.lineTo(p1.sx, p1.sy);
+      ctx.stroke();
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = pal.axisText;
+      ctx.fillText(a.label, p1.sx + 4, p1.sy + 4);
+    });
+    ctx.globalAlpha = 1;
+
+    // project everything, then painter's-algorithm sort back-to-front
+    const items = [];
+    scene3D.refs.forEach(r => items.push({ ...r, ...rotateProject(r.x, r.y, r.z, cx, cy, scale) }));
+    scene3D.centroids.forEach(c => items.push({ ...c, ...rotateProject(c.x, c.y, c.z, cx, cy, scale) }));
+    if (scene3D.you) items.push({ ...scene3D.you, ...rotateProject(scene3D.you.x, scene3D.you.y, scene3D.you.z, cx, cy, scale) });
+    items.sort((a, b) => a.persp - b.persp);
+
+    // dashed connector lines from "you" to its top centroids, drawn under the points
+    if (scene3D.you) {
+      const youP = items.find(i => i.kind === 'you');
+      scene3D.centroids.forEach(c => {
+        const cP = items.find(i => i.kind === 'centroid' && i.code === c.code);
+        if (!youP || !cP) return;
+        ctx.strokeStyle = c.color || pal.ink;
+        ctx.globalAlpha = c.rank === 0 ? 0.5 : 0.25;
+        ctx.lineWidth = c.rank === 0 ? 1.6 : 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(youP.sx, youP.sy);
+        ctx.lineTo(cP.sx, cP.sy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      });
+    }
+
+    items.forEach(it => {
+      const depthT = Math.max(0, Math.min(1, (it.persp - 0.55) / 0.9));
+      if (it.kind === 'ref') {
+        const r = 1.1 + depthT * 2.4;
+        ctx.globalAlpha = 0.18 + depthT * 0.55;
+        ctx.fillStyle = it.color || pal.refFallback;
+        ctx.beginPath();
+        ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        scatterHitPoints.push({ x: it.sx, y: it.sy, r: r + 2.5, type: 'ref', title: it.title, detail: it.detail });
+      } else if (it.kind === 'centroid') {
+        const r = (it.rank === 0 ? 8 : 5.5) * (0.6 + depthT * 0.6);
+        ctx.strokeStyle = it.color || pal.ink;
+        ctx.lineWidth = it.rank === 0 ? 2.5 : 1.5;
+        ctx.globalAlpha = 0.5 + depthT * 0.5;
+        ctx.beginPath();
+        ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = pal.ink;
+        ctx.font = it.rank === 0 ? pal.fontBold : pal.font;
+        ctx.fillText(it.code, it.sx + r + 3, it.sy - 4);
+        scatterHitPoints.push({ x: it.sx, y: it.sy, r: r + 4, type: 'centroid', title: it.title, detail: it.detail });
+      } else if (it.kind === 'you') {
+        const r = 6 * (0.7 + depthT * 0.5);
+        const glow = ctx.createRadialGradient(it.sx, it.sy, 0, it.sx, it.sy, r * 3.4);
+        glow.addColorStop(0, pal.youGlow);
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(it.sx, it.sy, r * 3.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = pal.youFill;
+        ctx.beginPath();
+        ctx.arc(it.sx, it.sy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = pal.youStroke;
+        ctx.lineWidth = pal.youLineWidth;
+        ctx.stroke();
+
+        ctx.fillStyle = pal.ink;
+        ctx.font = pal.fontBold;
+        ctx.fillText('you', it.sx + r + 5, it.sy + 4);
+        scatterHitPoints.push({ x: it.sx, y: it.sy, r: r + 6, type: 'you', title: it.title, detail: it.detail });
+      }
+    });
+  }
+
+  function animate3D() {
+    if (viewMode !== '3d' || !resultsEl.classList.contains('show')) { raf3D = null; return; }
+    if (autoRotate3D && !isDragging3D) rotY += 0.0016;
+    renderScene3D();
+    raf3D = requestAnimationFrame(animate3D);
+  }
+  function ensureAnimating3D() {
+    if (!raf3D) raf3D = requestAnimationFrame(animate3D);
+  }
+
+  function scatterPointerXY(e) {
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches && e.touches[0] ? e.touches[0] : e;
+    return { x: t.clientX, y: t.clientY };
+  }
+  function beginDrag3D(e) {
+    if (viewMode !== '3d') return;
+    isDragging3D = true;
+    autoRotate3D = false;
+    scatterHintEl.classList.add('fade');
+    const p = scatterPointerXY(e);
+    dragStart3D = { x: p.x, y: p.y, rotY, rotX };
+    canvas.style.cursor = 'grabbing';
+  }
+  function moveDrag3D(e) {
+    if (!isDragging3D || !dragStart3D) return;
+    const p = scatterPointerXY(e);
+    const dx = p.x - dragStart3D.x, dy = p.y - dragStart3D.y;
+    rotY = dragStart3D.rotY + dx * 0.01;
+    rotX = Math.max(-1.3, Math.min(1.3, dragStart3D.rotX - dy * 0.01));
+  }
+  function endDrag3D() {
+    if (!isDragging3D) return;
+    isDragging3D = false;
+    dragStart3D = null;
+    if (viewMode === '3d') canvas.style.cursor = 'grab';
+    clearTimeout(autoRotateResumeTimer);
+    autoRotateResumeTimer = setTimeout(() => { autoRotate3D = true; }, 2200);
+  }
+
+  canvas.addEventListener('mousedown', beginDrag3D);
+  window.addEventListener('mousemove', moveDrag3D);
+  window.addEventListener('mouseup', endDrag3D);
+  canvas.addEventListener('touchstart', (e) => { beginDrag3D(e); }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { if (isDragging3D) e.preventDefault(); moveDrag3D(e); }, { passive: false });
+  canvas.addEventListener('touchend', endDrag3D);
+  canvas.addEventListener('wheel', (e) => {
+    if (viewMode !== '3d') return;
+    e.preventDefault();
+    zoom3D = Math.max(0.55, Math.min(2.4, zoom3D - e.deltaY * 0.001));
+  }, { passive: false });
+
+  function setViewMode(mode) {
+    if (mode === viewMode) return;
+    viewMode = mode;
+    mode2dBtn.classList.toggle('active', mode === '2d');
+    mode3dBtn.classList.toggle('active', mode === '3d');
+    scatterHintEl.style.display = mode === '3d' ? '' : 'none';
+    if (mode === '3d') scatterHintEl.classList.remove('fade');
+    canvas.style.cursor = mode === '3d' ? 'grab' : 'default';
+    try { localStorage.setItem('ancestry-scatter-mode', mode); } catch (e) { /* ignore */ }
+    if (resultsEl.classList.contains('show') && lastRenderedData) {
+      if (mode === '3d') {
+        buildScene3D(lastRenderedData.pca_coordinates, lastRenderedData.closest_populations);
+        ensureAnimating3D();
+      } else {
+        drawScatter(lastRenderedData.pca_coordinates, lastRenderedData.closest_populations);
+      }
+    }
+  }
+  mode2dBtn.addEventListener('click', () => setViewMode('2d'));
+  mode3dBtn.addEventListener('click', () => setViewMode('3d'));
+
+  /** Single entry point that renders whichever mode is currently active
+   * -- called on a fresh result and on theme changes. */
+  function renderScatterView(data) {
+    if (!data) return;
+    if (viewMode === '3d') {
+      buildScene3D(data.pca_coordinates, data.closest_populations);
+      ensureAnimating3D();
+    } else {
+      drawScatter(data.pca_coordinates, data.closest_populations);
+    }
+  }
+
+  (function initScatterMode() {
+    let saved = '3d';
+    try { saved = localStorage.getItem('ancestry-scatter-mode') || '3d'; } catch (e) { /* ignore */ }
+    viewMode = saved === '2d' ? '2d' : '3d';
+    mode2dBtn.classList.toggle('active', viewMode === '2d');
+    mode3dBtn.classList.toggle('active', viewMode === '3d');
+    scatterHintEl.style.display = viewMode === '3d' ? '' : 'none';
+    canvas.style.cursor = viewMode === '3d' ? 'grab' : 'default';
+  })();
 
   // ---------------------------------------------------------------------
   // Theme toggle -- swaps between the "sketch" (hand-drawn) and "tactical"
@@ -1714,8 +2165,9 @@
     sketchStyleEl.disabled = theme !== 'sketch';
     tacticalStyleEl.disabled = theme !== 'tactical';
     themeToggleBtn.textContent = THEME_LABELS[theme];
+    starField = null;
     if (!opts.skipRedraw && resultsEl.classList.contains('show')) {
-      drawScatter(lastRenderedData?.pca_coordinates, lastRenderedData?.closest_populations);
+      renderScatterView(lastRenderedData);
     }
     try { localStorage.setItem('ancestry-theme', theme); } catch (e) { /* ignore */ }
   }
